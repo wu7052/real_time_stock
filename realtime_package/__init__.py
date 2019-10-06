@@ -6,4 +6,5 @@ pack_path = workpath + '\\realtime_package'
 sys.path.insert(0, pack_path)
 # print("@__init__ sys.path",sys.path)
 
-from realtime_eyes import rt_eyes
+from realtime_sina import rt_sina
+from realtime_east import rt_east

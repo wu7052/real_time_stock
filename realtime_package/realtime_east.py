@@ -9,5 +9,5 @@ from ex_data import ex_web_data
 import json
 from jsonpath import jsonpath
 
-class rt_eyes:
+class rt_east:
     pass

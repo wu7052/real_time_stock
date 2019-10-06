@@ -7,3 +7,4 @@ sys.path.insert(0, pack_path)
 # print("@__init__ sys.path",sys.path)
 
 from config_handler import conf_handler
+from xl_conf_handler import xl_handler
