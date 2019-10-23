@@ -1,13 +1,13 @@
-from stock_package import ts_data, sz_web_data, sh_web_data, ex_web_data, ma_kits, psy_kits
+from realtime_package import rt_163, rt_east, rt_sina
+from stock_package import ts_data, sz_web_data, sh_web_data, ex_web_data, ma_kits
 import pandas as pd
 from datetime import datetime, date, timedelta
 import time
 import new_logger as lg
 import re
-from conf import conf_handler
-from filter_package import filter_fix, filter_curve
-from report_package import ws_rp
-from db_package import db_ops
+from conf import conf_handler, xl_handler
+# from db_package import db_ops
+from realtime_package import rt_163
 
 # 计时器 装饰器
 def wx_timer(func):
@@ -35,9 +35,36 @@ def wx_timer_ret(func):
     return wrapper  # 这个语句 不属于 wrapper(), 而是 wx_timer 的返回值. 对应 func 后面这个()调用
 
 
+# 判断 某个日期 是否交易日, date 默认是当日
+def is_trading_date(date_str=''):
+    ts = ts_data()
+    if date_str == '':
+        date_str = (date.today()).strftime('%Y%m%d')
 
+    if ts.is_open(date_str = date_str):
+        return True
+    else:
+        return False
 
+# 获取实时数据
+# src 数据源 ， t_frame 读取间隔时间， id_arr 股票ID代码数组
+def acq_rt_data(rt=None, src='', t_frame=180):
+    wx = lg.get_handle()
 
+    # 股票代码数组，由 rt 对象内部变量 带入
+    # if id_arr is None:
+    #     wx.info("[Acq_RT_Data] 股票列表为空，退出")
+    #     return None
+
+    # rt 对象在主函数生成，传入此函数，添加
+    # if src == '163':
+    #     wx.info("[Acq_RT_Data] 开始从 [{}] 读取实时交易数据共 [{}] 支股票".format(src, len(id_arr) ))
+    #     rt = rt_163(date_str='')
+
+    for id in rt.id_arr:
+    # url = rt_163.url_encode("14:00:00")
+        json_str = rt.get_json_str(id=id)
+        rt_df = rt.json_parse(id=id, json_str=json_str)
 
 
 
@@ -308,6 +335,4 @@ def update_ind_ma_df(fresh=False, data_src='cq', bt_start_date='', bt_end_date='
             wx.info("[update_ind_ma_df]=========== {} {} MA =========== Data Loaded ALL ".format(pre, data_src))
         # else:
         #     wx.info("[update_ind_ma_df]=========== {} {} Stock =========== Empty [{}]".format(pre, data_src, len(id_arr)))
-
-
 

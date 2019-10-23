@@ -5,32 +5,32 @@
 import new_logger as lg
 lg._init_()
 wx = lg.get_handle()
-# from stock_package import ma_kits, psy_kits
-# from report_package import ws_rp
+from stock_package import ts_data
+from realtime_package import rt_163
 
 # import pandas as pd
 # from assess_package import back_trader
 # from functions import *
 from conf import conf_handler, xl_handler
 
-xl_h = xl_handler(f_name="accounts.xlsx")
-df = xl_h.rd_file()
-print(df)
+# 判断 某个日期 是否交易日
+# ts = ts_data()
+# if ts.is_open(date_str = '20191001'):
+#     print('open')
+# else:
+#     print("Close")
+
+rt_163 = rt_163(id_arr=['600026'], date_str='')
+url = rt_163.url_encode("14:00:00")
+json_str = rt_163.get_json_str(id='600026')
+rt_df = rt_163.json_parse(json_str = json_str)
+print(rt_df)
+# str_type = chardet.detect("10%3A13%3A34")
+# unicode = lg.str_decode("10%3A13%3A34", str_type['encoding'])
+# print(unicode)
 
 
-
-
-# wx.info("============================[update_sh_basic_info_2]上证主板基础信息更新==========================================")
-# update_sh_basic_info_2()
-# wx.info("============================[update_sh_basic_info_kc]科创板基础信息更新==========================================")
-# update_sh_basic_info_kc()
-# analysis_dgj()
-# analysis_hot_industry(duration = 10)
-# 按板块股票数量 比例出图
-# bt = back_trader(f_date='20190130', f_b_days=-100,  f_name='filter_rules\\filter_001.conf')
-# bt.clear_bt_data()
-# bt.get_qfq_data()
-
-
-# update_sh_basic_info_kc()
-# update_sh_basic_info_2()
+# 读取 accounts.xlsx
+# xl_h = xl_handler(f_name="accounts.xlsx")
+# df = xl_h.rd_file()
+# print(df)

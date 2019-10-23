@@ -3,12 +3,13 @@ from datetime import datetime, date, timedelta
 import time
 import new_logger as lg
 from conf import conf_handler
+import re
 
 class ts_data:
     __counter = 1
     __timer = 0
     def __init__(self):
-        self.h_conf = conf_handler(conf="stock_analyer.conf")
+        self.h_conf = conf_handler(conf="rt_analyer.conf")
         self.token = self.h_conf.rd_opt('tushare', 'token')
         self.api= ts.pro_api(self.token)
 
@@ -52,6 +53,34 @@ class ts_data:
             time.sleep(10)
             df_trade_cal = self.api.trade_cal(exchange='', start_date=start_date, end_date=today)
         return df_trade_cal
+
+    """
+    # 判断指定日期是否是交易日，返回 True/False
+    """
+    def is_open(self, date_str=''):
+        wx = lg.get_handle()
+        if date_str == '':
+            wx.info("[verify_trade_date] 日期为空，错误退出")
+            return None
+        if len(date_str) >= 10:
+            date_str = date_str[0:10]
+            date_str = re.sub(r'-','',date_str)
+        # today = datetime.now().strftime('%Y%m%d')
+        try:
+            df_trade_cal = self.api.trade_cal(exchange='', start_date=date_str, end_date=date_str)
+        except Exception as e:
+            wx.info("tushare exception: {}... sleep 10 seconds, retry....".format(e))
+            time.sleep(10)
+            df_trade_cal = self.api.trade_cal(exchange='', start_date=date_str, end_date=date_str)
+
+        open_arr = df_trade_cal.is_open.tolist()
+        if open_arr[0] == 1:
+            return True
+        else:
+            return False
+
+
+
 
     """
     # 获取指定时间区间的 前复权数据

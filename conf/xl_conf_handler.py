@@ -40,6 +40,29 @@ class xl_handler():
         self.active_accounts = df.loc[df.expiry >= today,]
         self.near_expiry_accounts = df.loc[(df.expiry <= next_3_days) & (df.expiry >= today) ,]
 
+        id_acc = pd.Series()
+        for x in range(1,10):
+            tmp = pd.Series(self.active_accounts.wechat.values, index=self.active_accounts['stock_'+str(x)])
+            # tmp.add(',')
+            if len(id_acc) == 0:
+                id_acc = tmp
+            else:
+                id_acc = tmp.append(id_acc)
+        self.df_id_acc = pd.DataFrame({'id':id_acc.index, 'wechat':id_acc.values})
+
+
+    # 统计需要监控的 stock id, 返回list数组
+    def get_stock_id_from_conf(self):
+        id_arr = list((set(self.df_id_acc.id.tolist())))
+        id_arr.remove('xxxxxx')
+        return id_arr
+
+    def get_wechat_by_if(self):
+        for df_each_id in self.df_id_acc.groupby(by=['id']):
+            print(df_each_id)
+        # self.id_acc = pd.pivot_table(df_id_acc, index=['id'], columns=['wechat'])
+        # print(self.id_acc)
+
         """
         wb = xlrd.open_workbook(filename=self.f_name)  # 打开文件
         print(wb.sheet_names())  # 获取所有表格名字

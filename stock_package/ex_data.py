@@ -24,7 +24,7 @@ class ex_web_data(object):
         # log_dir = os.path.abspath('.')
         # self.logger = myLogger(log_dir)
         try:
-            self.h_conf = conf_handler(conf="stock_analyer.conf")
+            self.h_conf = conf_handler(conf="rt_analyer.conf")
             host = self.h_conf.rd_opt('db', 'host')
             database = self.h_conf.rd_opt('db', 'database')
             user = self.h_conf.rd_opt('db', 'user')

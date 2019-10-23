@@ -10,7 +10,7 @@ import time
 class ma_kits(object):
     def __init__(self):
         # wx = lg.get_handle()
-        self.h_conf = conf_handler(conf="stock_analyer.conf")
+        self.h_conf = conf_handler(conf="rt_analyer.conf")
         ma_str = self.h_conf.rd_opt('ma', 'duration')
         self.ma_duration = ma_str.split(",")
 
