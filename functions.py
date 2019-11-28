@@ -1,4 +1,4 @@
-from realtime_package import rt_163, rt_east, rt_sina
+from realtime_package import rt_163, rt_east, rt_sina, rt_ana
 from stock_package import ts_data, sz_web_data, sh_web_data, ex_web_data, ma_kits
 import pandas as pd
 from datetime import datetime, date, timedelta
@@ -35,39 +35,42 @@ def wx_timer_ret(func):
     return wrapper  # 这个语句 不属于 wrapper(), 而是 wx_timer 的返回值. 对应 func 后面这个()调用
 
 
-# 判断 某个日期 是否交易日, date 默认是当日
-def is_trading_date(date_str=''):
-    ts = ts_data()
-    if date_str == '':
-        date_str = (date.today()).strftime('%Y%m%d')
 
-    if ts.is_open(date_str = date_str):
-        return True
-    else:
-        return False
 
 # 获取实时数据
 # src 数据源 ， t_frame 读取间隔时间， id_arr 股票ID代码数组
-def acq_rt_data(rt=None, src='', t_frame=180):
+def get_rt_data(rt=None, src=''):
     wx = lg.get_handle()
 
     # 股票代码数组，由 rt 对象内部变量 带入
-    # if id_arr is None:
-    #     wx.info("[Acq_RT_Data] 股票列表为空，退出")
-    #     return None
+    if rt.id_arr is None:
+        wx.info("[Get_RT_Data] 股票列表为空，退出")
+        return None
+
+    # 获得当前时间，作为查询实时交易数据的时间节点
+    time_str = time.strftime("%H:%M:%S", time.localtime())
+    # time_str = (datetime.datetime.now()).strftime("%H:%M:%S")
+    # 时间偏移到交易时间，测试用途
+    # time_str = (datetime.now()+timedelta(hours=-11)).strftime("%H:%M:%S")
 
     # rt 对象在主函数生成，传入此函数，添加
-    # if src == '163':
-    #     wx.info("[Acq_RT_Data] 开始从 [{}] 读取实时交易数据共 [{}] 支股票".format(src, len(id_arr) ))
-    #     rt = rt_163(date_str='')
+    if src == '163':
+        wx.info("[Get_RT_Data] 从 [{}] 时间[{}]交易数据共 [{}] 支股票".format(src, time_str, len(rt.id_arr) ))
 
-    for id in rt.id_arr:
-    # url = rt_163.url_encode("14:00:00")
-        json_str = rt.get_json_str(id=id)
-        rt_df = rt.json_parse(id=id, json_str=json_str)
+    for icount, id in enumerate(rt.id_arr):
+        wx.info("[Get_RT_Data][{}:{}] {} 获取逐笔交易数据".format(icount+1,len(rt.id_arr),id))
+        json_str = rt.get_json_str(id=id, time_str=time_str)
+        wx.info("[Get_RT_Data][{}:{}] {} 解析逐笔交易数据".format(icount+1, len(rt.id_arr), id))
+        rt.json_parse(id=id, json_str=json_str)
+        wx.info("[Get_RT_Data][{}:{}] {} 记录逐笔交易数据".format(icount+1, len(rt.id_arr), id))
 
 
+def ana_rt_data(rt=None):
+    wx = lg.get_handle()
+    analyzer = rt_ana()
 
+    wx.info("[Get_RT_Data]开始分析逐笔交易记录")
+    analyzer.rt_analyzer(rt_dict_df = rt.rt_dict_df)
 
 @wx_timer
 def update_daily_data_from_sina(date=None):  # date 把数据更新到指定日期，默认是当天

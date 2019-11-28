@@ -35,10 +35,12 @@ class rt_163:
     def url_encode(self, str):
         return parse.quote(str)
 
-    def get_json_str(self, id):
+    def get_json_str(self, id, time_str=''):
         wx = lg.get_handle()
-
-        url = "http://quotes.money.163.com/service/zhubi_ajax.html?symbol="+id+"&end=10%3A00%3A00"
+        if time_str == '':
+            wx.info("[rt_163][get_json_str] 查询时间为空，退出!")
+            return None
+        url = "http://quotes.money.163.com/service/zhubi_ajax.html?symbol="+id+"&end="+time_str  #10%3A00%3A00"
 
         header = {
             'Cookie': 'UM_distinctid=16bf36d52242f3-0693469a5596d3-e323069-1fa400-16bf36d5225362; _ntes_nnid=16b2182ff532e10833492eedde0996df,1563157161323; _ntes_nuid=16b2182ff532e10833492eedde0996df; vjuids=e0fb8aa0.16d4ee83324.0.e074eccb150e; P_INFO=ghzhy1212@163.com|1570190476|0|mail163|00&99|hen&1570190062&mail163#CN&null#10#0#0|&0|mail163|ghzhy1212@163.com; nts_mail_user=ghzhy1212@163.com:-1:1; mail_psc_fingerprint=8da65e9cc5769a658a69962d94f7c46f; _ntes_usstock_recent_=NTES%7C; _ntes_usstock_recent_=NTES%7C; vjlast=1568986903.1571018378.11; s_n_f_l_n3=e119c348b08890ac1571018378289; NNSSPID=0e35f22546f44023b00d65e2a3ca1f26; ne_analysis_trace_id=1571018721010; _ntes_stock_recent_=1002699%7C0600000%7C1000573; _ntes_stock_recent_=1002699%7C0600000%7C1000573; _ntes_stock_recent_=1002699%7C0600000%7C1000573; pgr_n_f_l_n3=e119c348b08890ac1571018815386610; vinfo_n_f_l_n3=e119c348b08890ac.1.5.1563157161368.1570632456351.1571018833379',
@@ -90,10 +92,12 @@ class rt_163:
                             4: 'time_stamp_sec', 5: 'time_stamp_usec', 6: 'time_str'}, inplace=True)
 
         if id in self.rt_dict_df.keys():
-            self.rt_dict_df[id] = self.rt_dict_df[id].append(df1)
+            self.rt_dict_df[id] = self.rt_dict_df[id].append(df1).drop_duplicates()
         else:
             self.rt_dict_df[id] = df1
-        return df1
+
+        # df1 = self.rt_dict_df[id].drop_duplicates()
+        # return df1
 
         # df = df.drop_duplicates( subset = ['YJML', 'EJML', 'SJML', 'WZLB', 'GGXHPZ', 'CGMS'],# 去重列，按这些列进行去重
         # 　　keep = 'first'  # 保存第一条重复数据

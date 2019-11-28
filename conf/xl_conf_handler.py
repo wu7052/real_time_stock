@@ -57,7 +57,7 @@ class xl_handler():
         id_arr.remove('xxxxxx')
         return id_arr
 
-    def get_wechat_by_if(self):
+    def get_wechat_by_id(self):
         for df_each_id in self.df_id_acc.groupby(by=['id']):
             print(df_each_id)
         # self.id_acc = pd.pivot_table(df_id_acc, index=['id'], columns=['wechat'])
