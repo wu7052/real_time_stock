@@ -14,9 +14,9 @@ from tushare_data import ts_data
 
 class rt_163:
     def __init__(self, id_arr=None, date_str = None): #,, items_page=200):  time_frame=180):
-        self.wx = lg.get_handle()
+        wx = lg.get_handle()
         if id_arr is None:
-            self.wx.info("[rt_163] id_arr is None , __init__ EXIT !")
+            wx.info("[rt_163] id_arr is None , __init__ EXIT !")
             return None
         else:
             self.id_arr = id_arr
@@ -31,6 +31,67 @@ class rt_163:
         # DataFrame 字典， key = id, value = Dataframe
         # 用来保存 通过rt_163获取的各股票的实时数据DataFrame
         self.rt_dict_df = {}
+
+        # 建立数据库对象
+        self.h_conf = conf_handler(conf="rt_analyer.conf")
+        host = self.h_conf.rd_opt('db', 'host')
+        database = self.h_conf.rd_opt('db', 'database')
+        user = self.h_conf.rd_opt('db', 'user')
+        pwd = self.h_conf.rd_opt('db', 'pwd')
+        self.db = db_ops(host=host, db=database, user=user, pwd=pwd)
+        self.cq_tname_00 = self.h_conf.rd_opt('db', 'daily_table_cq_00')
+        self.cq_tname_30 = self.h_conf.rd_opt('db', 'daily_table_cq_30')
+        self.cq_tname_60 = self.h_conf.rd_opt('db', 'daily_table_cq_60')
+        self.cq_tname_002 = self.h_conf.rd_opt('db', 'daily_table_cq_002')
+        self.cq_tname_68 = self.h_conf.rd_opt('db', 'daily_table_cq_68')
+
+    # 获得监控股票的前 N 天的成交量数据
+    def get_std_PV(self):
+        all_t_name = [self.cq_tname_00, self.cq_tname_30, self.cq_tname_60, self.cq_tname_002, self.cq_tname_68]
+        std_days = self.h_conf.rd_opt('general', 'std_days')
+
+        std_date = self.db.get_trade_date(back_days= std_days)
+        id_arr_str = (",".join(self.id_arr))
+        std_df = pd.DataFrame()
+        for t_name in all_t_name:
+            sql = "SELECT id, date, vol, amount, pct_up_down FROM "+ t_name +" where id in ("+id_arr_str+\
+                  ") and date >= "+ std_date +" order by date desc;"
+            temp_df = self.db._exec_sql(sql = sql)
+            if std_df.empty:
+                std_df = temp_df
+            else:
+                std_df = std_df.append(temp_df)
+
+        # std_PV_df_grp = std_PV_df.groupby(['id'])
+        # for count, single_std_PV_df in enumerate(std_PV_df_grp):
+        #     pass
+
+        std_V_df = std_df['vol'].groupby(std_df['id']).sum()  # N天累计成交量，单位 ：100股
+        std_A_df = std_df['amount'].groupby(std_df['id']).sum() # N天累计成交金额，单位：1000元
+        std_Pct_df = std_df['pct_up_down'].groupby(std_df['id']).sum() # N天价格的累计振幅
+        std_days_df = std_df['date'].groupby(std_df['id']).count() # 统计天数
+        std_PVA_df = pd.concat([std_V_df, std_A_df, std_Pct_df, std_days_df], axis=1)
+        # std_PVA_df.reset_index(drop=False, inplace=True)
+
+        # 过去N天 0.1% 振幅 的成交量 单位元
+        std_PVA_df['ave_amount_per_pct'] = std_PVA_df['amount']*100/std_PVA_df['pct_up_down']
+
+        # 平均每分钟的成交金额 单位元
+        std_PVA_df['ave_amount_per_mint'] = (std_PVA_df['amount']*1000)/(std_PVA_df['date']*240)
+
+        # 平均每分钟的成交量，单位 100股
+        std_PVA_df['ave_vol_per_mint'] = std_PVA_df['vol']/(std_PVA_df['date']*240)
+        self.std_PVA_dict = std_PVA_df.to_dict(orient= 'index')
+        # return std_PVA_df
+
+    # 添加监控的股票
+    def add_id(self, id = None):
+        wx = lg.get_handle()
+        if id is None or len(id)==0 :
+            wx.info("[rt_163] 增加股票ID为空")
+            return False
+        self.id_arr.append(id)
+        return True
 
     def url_encode(self, str):
         return parse.quote(str)

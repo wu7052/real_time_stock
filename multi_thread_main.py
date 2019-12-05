@@ -42,15 +42,22 @@ id_arr = xl_h.get_stock_id_from_conf()
 
 # 初始化 rt163 对象
 rt163 = rt_163(id_arr=id_arr, date_str=None)
+# 获得过去N天的交易记录，建立基线
+rt163.get_std_PV()
+
 
 # 读取实时数据，进入 rt163 的内部变量
+get_rt_data(rt=rt163, src='163')
+time.sleep(120)
+get_rt_data(rt=rt163, src='163')
+# time.sleep(120)
 # get_rt_data(rt=rt163, src='163')
 # time.sleep(120)
 # get_rt_data(rt=rt163, src='163')
-# ana_rt_data(rt=rt163)
+ana_rt_data(rt=rt163)
 
-schedule.every(4).minutes.do(get_rt_data, rt=rt163, src='163')
-schedule.every(4).minutes.do(ana_rt_data, rt=rt163)
+# schedule.every(4).minutes.do(get_rt_data, rt=rt163, src='163')
+# schedule.every(4).minutes.do(ana_rt_data, rt=rt163)
 
 # schedule.every().hour.do(job)
 # schedule.every().day.at("10:30").do(job)
@@ -59,9 +66,9 @@ schedule.every(4).minutes.do(ana_rt_data, rt=rt163)
 # schedule.every().wednesday.at("13:15").do(job)
 # schedule.every().minute.at(":17").do(job)
 
-while True:
-    schedule.run_pending()
-    time.sleep(1)
+# while True:
+#     schedule.run_pending()
+#     time.sleep(1)
 
 """
 thrd_sh = threading.Thread(target=update_sh_basic_info_2,args=())

@@ -1,6 +1,7 @@
 import pymysql
 import new_logger as lg
 import pandas as pd
+from conf import conf_handler
 
 class db_ops:
     wx = lg.get_handle()
@@ -33,6 +34,16 @@ class db_ops:
         # wx = lg.get_handle()
         # wx.info("[OBJ] db_ops : __del__ called")
         pass
+
+    def get_trade_date(self, back_days=1):
+        self.h_conf = conf_handler(conf="rt_analyer.conf")
+        tname = self.h_conf.rd_opt('db', 'daily_table_cq_60')
+        sql = "select distinct date from "+tname+" order by date desc limit "+ str(back_days)
+        df = self._exec_sql(sql = sql)
+        df.sort_values(by='date',ascending=False, inplace=True)
+        # 取得最后一天的日期
+        trade_date = df.iloc[-1][0]
+        return  trade_date
 
     def select_table(self, t_name=None, where="", order="", limit=100):
         wx = lg.get_handle()

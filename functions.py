@@ -48,29 +48,26 @@ def get_rt_data(rt=None, src=''):
         return None
 
     # 获得当前时间，作为查询实时交易数据的时间节点
-    time_str = time.strftime("%H:%M:%S", time.localtime())
+    # time_str = time.strftime("%H:%M:%S", time.localtime())
     # time_str = (datetime.datetime.now()).strftime("%H:%M:%S")
     # 时间偏移到交易时间，测试用途
-    # time_str = (datetime.now()+timedelta(hours=-11)).strftime("%H:%M:%S")
+    time_str = (datetime.now()+timedelta(hours=-11)).strftime("%H:%M:%S")
 
     # rt 对象在主函数生成，传入此函数，添加
     if src == '163':
-        wx.info("[Get_RT_Data] 从 [{}] 时间[{}]交易数据共 [{}] 支股票".format(src, time_str, len(rt.id_arr) ))
+        wx.info("[Get_RT_Data] [{}]从 [{}] 交易数据共 [{}] 支股票".format(src, time_str, len(rt.id_arr) ))
 
     for icount, id in enumerate(rt.id_arr):
-        wx.info("[Get_RT_Data][{}:{}] {} 获取逐笔交易数据".format(icount+1,len(rt.id_arr),id))
+        # wx.info("[Get_RT_Data][{}:{}] {} 获取逐笔交易数据[{}]".format(icount+1,len(rt.id_arr),id, time_str))
         json_str = rt.get_json_str(id=id, time_str=time_str)
-        wx.info("[Get_RT_Data][{}:{}] {} 解析逐笔交易数据".format(icount+1, len(rt.id_arr), id))
+        # wx.info("[Get_RT_Data][{}:{}] {} 解析逐笔交易数据[{}]".format(icount+1,len(rt.id_arr),id, time_str))
         rt.json_parse(id=id, json_str=json_str)
-        wx.info("[Get_RT_Data][{}:{}] {} 记录逐笔交易数据".format(icount+1, len(rt.id_arr), id))
+        wx.info("[Get_RT_Data][{}:{}] {} 记录逐笔交易数据[{}]".format(icount+1,len(rt.id_arr),id, time_str))
 
 
 def ana_rt_data(rt=None):
-    wx = lg.get_handle()
     analyzer = rt_ana()
-
-    wx.info("[Get_RT_Data]开始分析逐笔交易记录")
-    analyzer.rt_analyzer(rt_dict_df = rt.rt_dict_df)
+    analyzer.rt_analyzer(rt = rt)
 
 @wx_timer
 def update_daily_data_from_sina(date=None):  # date 把数据更新到指定日期，默认是当天
