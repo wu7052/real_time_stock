@@ -14,7 +14,7 @@ from stock_package import ts_data
 from functions import *
 from conf import conf_handler, xl_handler
 
-from realtime_package import rt_163, wx_timer
+from realtime_package import rt_163, wx_timer, rt_ana
 
 my_timer = wx_timer()
 
@@ -40,24 +40,30 @@ xl_h.rd_file()
 id_arr = xl_h.get_stock_id_from_conf()
 
 
-# 初始化 rt163 对象
+# 初始化 rt163 对象，用于爬取数据
 rt163 = rt_163(id_arr=id_arr, date_str=None)
 # 获得过去N天的交易记录，建立基线
 rt163.get_std_PV()
 
+# 初始化 analyzer 对象，用于数据分析
+analyzer = rt_ana()
+
 
 # 读取实时数据，进入 rt163 的内部变量
 get_rt_data(rt=rt163, src='163')
+analyzer.rt_analyzer(rt=rt163)
+
 time.sleep(120)
 get_rt_data(rt=rt163, src='163')
+analyzer.rt_analyzer(rt=rt163)
+
 # time.sleep(120)
 # get_rt_data(rt=rt163, src='163')
 # time.sleep(120)
 # get_rt_data(rt=rt163, src='163')
-ana_rt_data(rt=rt163)
 
 # schedule.every(4).minutes.do(get_rt_data, rt=rt163, src='163')
-# schedule.every(4).minutes.do(ana_rt_data, rt=rt163)
+# schedule.every(4).minutes.do(ana_rt_data, rt=rt163, ana=analyzer)
 
 # schedule.every().hour.do(job)
 # schedule.every().day.at("10:30").do(job)

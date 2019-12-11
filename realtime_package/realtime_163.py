@@ -47,12 +47,15 @@ class rt_163:
 
     # 获得监控股票的前 N 天的成交量数据
     def get_std_PV(self):
+        wx = lg.get_handle()
         all_t_name = [self.cq_tname_00, self.cq_tname_30, self.cq_tname_60, self.cq_tname_002, self.cq_tname_68]
         std_days = self.h_conf.rd_opt('general', 'std_days')
 
         std_date = self.db.get_trade_date(back_days= std_days)
         id_arr_str = (",".join(self.id_arr))
         std_df = pd.DataFrame()
+        wx.info("[rt_163][get_std_PV] 开始为 [{}支股票] 设立基线数据，以 [{}] 为基线数据统计的开始日期".
+                format(len(self.id_arr),std_date))
         for t_name in all_t_name:
             sql = "SELECT id, date, vol, amount, pct_up_down FROM "+ t_name +" where id in ("+id_arr_str+\
                   ") and date >= "+ std_date +" order by date desc;"
@@ -62,27 +65,39 @@ class rt_163:
             else:
                 std_df = std_df.append(temp_df)
 
-        # std_PV_df_grp = std_PV_df.groupby(['id'])
-        # for count, single_std_PV_df in enumerate(std_PV_df_grp):
-        #     pass
-
         std_V_df = std_df['vol'].groupby(std_df['id']).sum()  # N天累计成交量，单位 ：100股
         std_A_df = std_df['amount'].groupby(std_df['id']).sum() # N天累计成交金额，单位：1000元
+        std_days_df = std_df['date'].groupby(std_df['id']).count()  # 统计天数
+
+        # 按天计算 0.01% 涨幅 对应的成交量，并计算N天的平均值
+        std_df['A_per_pct'] = (std_df['amount']*1000) / (std_df['pct_up_down'] * 100)
+        std_A_Pct_df = std_df['A_per_pct'].groupby(std_df['id']).mean()
+
         std_Pct_df = std_df['pct_up_down'].groupby(std_df['id']).sum() # N天价格的累计振幅
-        std_days_df = std_df['date'].groupby(std_df['id']).count() # 统计天数
-        std_PVA_df = pd.concat([std_V_df, std_A_df, std_Pct_df, std_days_df], axis=1)
+
+        std_PVA_df = pd.concat([std_V_df, std_A_df, std_Pct_df, std_A_Pct_df, std_days_df], axis=1)
         # std_PVA_df.reset_index(drop=False, inplace=True)
 
-        # 过去N天 0.1% 振幅 的成交量 单位元
-        std_PVA_df['ave_amount_per_pct'] = std_PVA_df['amount']*100/std_PVA_df['pct_up_down']
-
-        # 平均每分钟的成交金额 单位元
-        std_PVA_df['ave_amount_per_mint'] = (std_PVA_df['amount']*1000)/(std_PVA_df['date']*240)
+         # 平均每分钟的成交金额 单位元
+        std_PVA_df['ave_A_per_Mint'] = (std_PVA_df['amount']*1000)/(std_PVA_df['date']*240)
 
         # 平均每分钟的成交量，单位 100股
-        std_PVA_df['ave_vol_per_mint'] = std_PVA_df['vol']/(std_PVA_df['date']*240)
+        # 用不到这个数据，直接用成交金额就可以了
+        std_PVA_df['ave_vol_per_Mint'] = std_PVA_df['vol']/(std_PVA_df['date']*240)
+
+        #  过去N天 0.01% 振幅 的成交量 单位元
+        std_PVA_df['ave_A_per_Pct'] = (std_PVA_df['amount'] * 1000) / (std_PVA_df['pct_up_down'] * 100)
+
+        # 用过去N天的均值作为基线数据不准确，直接设为0，用当天的数据 迭代出基线数据
+        # std_PVA_df['ave_A_per_Pct'] = 0
+
+
+        # 保存基线数据到 内部对象，字典 和 DataFrame 两种类型
+        self.std_PVA_df = std_PVA_df
+        self.std_PVA_df.reset_index(drop=False, inplace=True)
         self.std_PVA_dict = std_PVA_df.to_dict(orient= 'index')
-        # return std_PVA_df
+        wx.info("[rt_163][get_std_PV] [{}支股票]的基线数据设立完毕".format(len(self.id_arr)))
+
 
     # 添加监控的股票
     def add_id(self, id = None):
@@ -151,11 +166,13 @@ class rt_163:
         df1 = df.T
         df1.rename(columns={0: 'seq', 1: 'type', 2: 'price', 3: 'vol',
                             4: 'time_stamp_sec', 5: 'time_stamp_usec', 6: 'time_str'}, inplace=True)
-
+        ret_time_arr = [df1.time_str.min(), df1.time_str.max()]
         if id in self.rt_dict_df.keys():
             self.rt_dict_df[id] = self.rt_dict_df[id].append(df1).drop_duplicates()
+            self.rt_dict_df[id] = self.rt_dict_df[id].sort_values(by="time_str", ascending=False)
         else:
             self.rt_dict_df[id] = df1
+        return ret_time_arr
 
         # df1 = self.rt_dict_df[id].drop_duplicates()
         # return df1

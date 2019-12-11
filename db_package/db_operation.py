@@ -5,9 +5,15 @@ from conf import conf_handler
 
 class db_ops:
     wx = lg.get_handle()
-    def __init__(self, host='localhost', db='mysql', user='root', pwd=None):
+    def __init__(self):
         wx = lg.get_handle()
         try:
+            self.h_conf = conf_handler(conf="stock_analyer.conf")
+            host = self.h_conf.rd_opt('db', 'host')
+            db = self.h_conf.rd_opt('db', 'database')
+            user = self.h_conf.rd_opt('db', 'user')
+            pwd = self.h_conf.rd_opt('db', 'pwd')
+
             if pwd is None:
                 wx.info("[Err DB_OP]===> {0}:{1}:{2} need password ".format(host, db, user))
                 raise Exception("Password is Null")
@@ -36,8 +42,8 @@ class db_ops:
         pass
 
     def get_trade_date(self, back_days=1):
-        self.h_conf = conf_handler(conf="rt_analyer.conf")
-        tname = self.h_conf.rd_opt('db', 'daily_table_cq_60')
+        self.rt_conf = conf_handler(conf="rt_analyer.conf")
+        tname = self.rt_conf.rd_opt('db', 'daily_table_cq_60')
         sql = "select distinct date from "+tname+" order by date desc limit "+ str(back_days)
         df = self._exec_sql(sql = sql)
         df.sort_values(by='date',ascending=False, inplace=True)
