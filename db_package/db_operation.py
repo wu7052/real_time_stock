@@ -8,9 +8,9 @@ class db_ops:
     def __init__(self):
         wx = lg.get_handle()
         try:
-            self.h_conf = conf_handler(conf="stock_analyer.conf")
+            self.h_conf = conf_handler(conf="rt_analyer.conf")
             host = self.h_conf.rd_opt('db', 'host')
-            db = self.h_conf.rd_opt('db', 'database')
+            database = self.h_conf.rd_opt('db', 'database')
             user = self.h_conf.rd_opt('db', 'user')
             pwd = self.h_conf.rd_opt('db', 'pwd')
 
@@ -23,7 +23,7 @@ class db_ops:
                     'host': host,
                     'user': user,
                     'password': pwd,
-                    'database': db,
+                    'database': database,
                     'charset': 'utf8',
                     'port': 3306  # 注意端口为int 而不是str
                 }
@@ -78,3 +78,20 @@ class db_ops:
         else:
             wx.info("[_exec_sql] Empty Dataframe Returned : SQL {}".format(sql))
             return None
+
+    def db_load_into_RT_BL_Big_Deal(self, df = None):
+        wx = lg.get_handle()
+        t_name = self.h_conf.rd_opt('db', 'rt_baseline_big')
+        if df is None:
+            wx.info("[db_load_into_RT_BL_Big_Deal]Err: dataframe is Empty,")
+            return -1
+        df_array = df.values.tolist()
+        i = 0
+        while i < len(df_array):
+            df_array[i] = tuple(df_array[i])
+            i += 1
+        # ['id', 'date', 't_frame', 'big_qty', 'big_abs_pct', 'big_io_pct', 'big_buy_pct', 'big_sell_pct']
+        sql = "REPLACE INTO "+t_name+" SET id=%s, date=%s, t_frame=%s, big_qty=%s, big_abs_pct=%s, big_io_pct=%s, " \
+              "big_buy_pct=%s, big_sell_pct=%s"
+        self.cursor.executemany(sql, df_array)
+        self.handle.commit()

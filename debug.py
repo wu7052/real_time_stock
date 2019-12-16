@@ -10,8 +10,9 @@ from realtime_package import rt_163
 
 # import pandas as pd
 # from assess_package import back_trader
-# from functions import *
+from functions import *
 from conf import conf_handler, xl_handler
+
 
 # 从配置文件 rt_analyer.conf 读取参数，初始化
 h_conf = conf_handler(conf="rt_analyer.conf")
@@ -24,7 +25,13 @@ id_arr = xl_h.get_stock_id_from_conf()
 
 
 rt163 = rt_163(id_arr=id_arr, date_str='')
-rt163.get_std_PV()
+traceback_rt_data(rt=rt163, src='163')
+
+# rt163.baseline_big_deal(date_str='20191213', time_frame_arr=['09:30','10:00'] )
+
+# rt163.clr_rt_data(minutes=0)
+print("done")
+# rt163.get_std_PV()
 # url = rt_163.url_encode("14:00:00")
 # json_str = rt_163.get_json_str(id='600026')
 # rt_df = rt_163.json_parse(json_str = json_str)
