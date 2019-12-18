@@ -1,4 +1,4 @@
-from realtime_package import rt_163, rt_east, rt_sina, rt_ana
+from realtime_package import rt_163, rt_east, rt_sina, rt_ana, rt_bl
 import pandas as pd
 from datetime import datetime, timedelta
 import time
@@ -45,10 +45,10 @@ def get_rt_data(rt=None, src=''):
         return None
 
     # 获得当前时间，作为查询实时交易数据的时间节点
-    # time_str = time.strftime("%H:%M:%S", time.localtime())
+    time_str = time.strftime("%H:%M:%S", time.localtime())
     # time_str = (datetime.datetime.now()).strftime("%H:%M:%S")
     # 时间偏移到交易时间，测试用途
-    time_str = (datetime.now()+timedelta(hours=-6)).strftime("%H:%M:%S")
+    # time_str = (datetime.now()+timedelta(hours=-6)).strftime("%H:%M:%S")
 
     # rt 对象在主函数生成，传入此函数，添加
     if src == '163':
@@ -83,8 +83,8 @@ def rebase_rt_data(id_arr = None, rt=None):
             continue
         else:
             rt_df = rt.rt_dict_df[id]
-            rt_end_time = rt_df['time_stamp_sec'].max()
-            rt_begin_time = rt_df['time_stamp_sec'].min()
+            rt_end_time = rt_df['time_stamp'].max()
+            rt_begin_time = rt_df['time_stamp'].min()
             rt_begin_timestr = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(rt_begin_time))
             rt_end_timestr = time.strftime("%H:%M:%S", time.localtime(rt_end_time))
             wx.info("[rebase_rt_data]开始更新[{}]的数据基线[{}--{}]".format(id, rt_begin_timestr, rt_end_timestr))
@@ -129,23 +129,31 @@ def rebase_rt_data(id_arr = None, rt=None):
             # rt_rule_result_summery.columns = ['id', 'big_counter', 'ave_big_A_per_mint', 'big_A_sum_abs', 'big_A_sum_io']
             # rt_rule_result_summery.fillna(0, inplace=True)
 
-# 获取实时数据
+
 # rt实时对象，src 数据源
-def traceback_rt_data(rt=None, src=''):
+# 利用全局RT 对象完成 数据收集
+# 创建BL 对象完成 基线设定、导入数据库
+def traceback_rt_data(rt=None, src='', date_str = None):
     wx = lg.get_handle()
 
     # 股票代码数组，由 rt 对象内部变量 带入
     if rt.id_arr is None:
-        wx.info("[Get_RT_Data] 股票列表为空，退出")
+        wx.info("[traceback_rt_data] 股票列表为空，退出")
         return None
 
+    # 股票代码数组，由 rt 对象内部变量 带入
+    if date_str is None or len(date_str) == 0:
+        date_str = (datetime.today()).strftime('%Y%m%d')
+        wx.info("[traceback_rt_data] 未指定回溯的日期，默认使用 {}".format(date_str))
+
     # 起始时间，作为查询实时交易数据的时间节点
-    date_str = '20191216'
+    # date_str = '20191216'
     begin_time_arr = ['09:30','10:30','13:00','14:00']
-    end_time_arr = ['10:30','11:30','14:00','15:00']
-    # end_time_arr = ['11:30'] #,'15:00']
+    end_time_arr = ['09:35','11:30','14:00','15:00']
+    # end_time_arr = ['10:30','11:30','14:00','15:00']
 
     baseline_big_deal_df = pd.DataFrame()
+    bl = rt_bl()
     for index in range(len(begin_time_arr)):
         time_inc = 5
         begin_time_stamp = int(time.mktime(time.strptime(date_str+begin_time_arr[index], "%Y%m%d%H:%M")))
@@ -169,6 +177,12 @@ def traceback_rt_data(rt=None, src=''):
                 else:
                     wx.info("[Get_RT_Data][{}/{}] {} [{}--{}]逐笔交易数据[{}]".format(icount+1,len(rt.id_arr),id,time_range[0],time_range[1], time_str))
                 time.sleep(0.5)
-        baseline_big_deal_df = rt.baseline_big_deal(date_str=date_str, time_frame_arr=[begin_time_arr[index], end_time_arr[index]])
-        rt.db_load_baseline_big_deal(df = baseline_big_deal_df)
-        rt.clr_rt_data(minutes=30)
+
+        bl.baseline_PA(rt=rt, date_str=date_str, time_frame_arr=[begin_time_arr[index], end_time_arr[index]])
+
+        # 大单交易的 基线数据，每个小时产生一次
+        # baseline_big_deal_df = bl.baseline_big_deal(rt=rt, date_str=date_str, time_frame_arr=[begin_time_arr[index], end_time_arr[index]])
+        # 导入数据库
+        # bl.db_load_baseline_big_deal(df = baseline_big_deal_df)
+        # 释放 RT 对象的内部变量，只保留 最后30分钟的交易数据
+        # rt.clr_rt_data(minutes=30)

@@ -25,13 +25,16 @@ id_arr = xl_h.get_stock_id_from_conf()
 
 
 rt163 = rt_163(id_arr=id_arr, date_str='')
-traceback_rt_data(rt=rt163, src='163')
 
-# rt163.baseline_big_deal(date_str='20191213', time_frame_arr=['09:30','10:00'] )
+# rt实时对象，src 数据源
+# 利用全局RT 对象完成 数据收集
+# 创建BL 对象完成 基线设定、导入数据库
+traceback_rt_data(rt=rt163, src='163', date_str = '')
+
 
 # rt163.clr_rt_data(minutes=0)
 print("done")
-# rt163.get_std_PV()
+
 # url = rt_163.url_encode("14:00:00")
 # json_str = rt_163.get_json_str(id='600026')
 # rt_df = rt_163.json_parse(json_str = json_str)

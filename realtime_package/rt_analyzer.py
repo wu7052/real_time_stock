@@ -162,10 +162,10 @@ class rt_ana:
             return None
         rt_df=rt_df.sort_values(by="time_str", ascending= False)
         # 最后一条交易记录的时间戳
-        lastest_t_stamp = rt_df.head(1)["time_stamp_sec"][0]
+        lastest_t_stamp = rt_df.head(1)["time_stamp"][0]
         # 减去时间片长度，得到开始的时间戳
         start_t_stamp = lastest_t_stamp - t_slice
-        sliced_rt_df = rt_df.loc[rt_df['time_stamp_sec'] >= start_t_stamp]
+        sliced_rt_df = rt_df.loc[rt_df['time_stamp'] >= start_t_stamp]
         return sliced_rt_df
 
     def output_table(self, dd_df=None, filename='null', sheet_name=None, type='.xlsx', index=False):
@@ -184,6 +184,3 @@ class rt_ana:
             else:
                 dd_df.to_csv(filename, index=index, encoding='utf_8_sig')
 
-    def PA_rolling_sum(self, rt=None):
-        # pd.to_datetime(rt.rt_dict_df['600183']['time_str'], format="%H:%M:%S")
-        pass

@@ -90,8 +90,8 @@ class db_ops:
         while i < len(df_array):
             df_array[i] = tuple(df_array[i])
             i += 1
-        # ['id', 'date', 't_frame', 'big_qty', 'big_abs_pct', 'big_io_pct', 'big_buy_pct', 'big_sell_pct']
+        # ['id', 'date', 't_frame', 'big_qty', 'big_abs_pct', 'big_io_pct', 'big_buy_pct', 'big_sell_pct','amount']
         sql = "REPLACE INTO "+t_name+" SET id=%s, date=%s, t_frame=%s, big_qty=%s, big_abs_pct=%s, big_io_pct=%s, " \
-              "big_buy_pct=%s, big_sell_pct=%s"
+              "big_buy_pct=%s, big_sell_pct=%s, amount=%s"
         self.cursor.executemany(sql, df_array)
         self.handle.commit()
