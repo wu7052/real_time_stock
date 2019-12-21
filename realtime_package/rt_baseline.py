@@ -94,33 +94,42 @@ class rt_bl:
 
             # 過濾掉 成交量 == 0 & 價格變動 ==0 的 時間段記錄
             id_baseline_PA_df = id_baseline_PA_df.loc[(id_baseline_PA_df['amount'] > 0)&(id_baseline_PA_df['pct_chg'] >0),]
-
+            # 将 pd.datetime64 之差 转换成 float 类型，方便判断 时间切片内的涨跌
             id_baseline_PA_df['pct_up_down'] = pd.to_numeric(id_baseline_PA_df['pct_up_down'])
 
-
-            id_baseline_PA_df['id'] = id
-            id_baseline_PA_df['t_frame'] = "-".join(time_frame_arr)
-            id_baseline_PA_df['sample_time'] = self.rt_PA_resample_secs
             # 量价向量长度
             id_baseline_PA_df['pa_vector'] = pow( pow(id_baseline_PA_df['amount'],2) + pow(id_baseline_PA_df['pct_chg'],2),0.5)
             # 量价向量方向
             id_baseline_PA_df['pct_dir'] = id_baseline_PA_df['pct_up_down'].apply(lambda x: x/abs(x) if x != 0 else 0)
 
-            # 上涨向量
+            # 上涨向量，去极值后，求均值 标准差
             id_up_baseline_PA_df = id_baseline_PA_df.loc[id_baseline_PA_df['pct_up_down']>0,]
-            id_up_baseline_PA_df = self._pa_df_(id_up_baseline_PA_df)
-
-            # 下跌向量
-            id_down_baseline_PA_df = id_baseline_PA_df.loc[id_baseline_PA_df['pct_up_down']<0,]
-            id_down_baseline_PA_df = self._pa_df_(id_down_baseline_PA_df)
-
-            if baseline_PA_df.empty or baseline_PA_df is None:
-                baseline_PA_df = id_up_baseline_PA_df
-                baseline_PA_df = baseline_PA_df.append(id_down_baseline_PA_df)
-
+            if id_up_baseline_PA_df is not None and len(id_up_baseline_PA_df) >0:
+                id_up_baseline_PA_df = self._pa_df_(id_up_baseline_PA_df)
+                id_up_bl_PA_ave = id_up_baseline_PA_df['pa_vector'].mean()
+                id_up_bl_PA_std = id_up_baseline_PA_df['pa_vector'].std()
             else:
-                baseline_PA_df = baseline_PA_df.append(id_up_baseline_PA_df)
-                baseline_PA_df = baseline_PA_df.append(id_down_baseline_PA_df)
+                id_up_bl_PA_ave = 0
+                id_up_bl_PA_std = 0
+
+            # 下跌向量，去极值后，求均值 标准差
+            id_down_baseline_PA_df = id_baseline_PA_df.loc[id_baseline_PA_df['pct_up_down']<0,]
+            if id_down_baseline_PA_df is not None and len(id_down_baseline_PA_df) >0:
+                id_down_baseline_PA_df = self._pa_df_(id_down_baseline_PA_df)
+                id_down_bl_PA_ave = id_up_baseline_PA_df['pa_vector'].mean()
+                id_down_bl_PA_std = id_up_baseline_PA_df['pa_vector'].std()
+            else:
+                id_down_bl_PA_ave = 0
+                id_down_bl_PA_std = 0
+
+            pa_baseline = {"id":id, "date":date_str,"t_frame":"-".join(time_frame_arr), "sample_time":self.rt_PA_resample_secs,
+                           "up_bl_pa_ave":id_up_bl_PA_ave, "up_bl_pa_std":id_up_bl_PA_std,
+                           "down_bl_pa_ave":id_down_bl_PA_ave, "down_bl_pa_std":id_down_bl_PA_std}
+
+            if baseline_PA_df is None or baseline_PA_df.empty:
+                baseline_PA_df = pd.DataFrame([pa_baseline])
+            else:
+                baseline_PA_df = baseline_PA_df.append(pd.DataFrame([pa_baseline]))
 
             # 使用rolling 滑动窗口 取样，放弃这种方式
             # id_baseline_PA_df['amount'] = rt_df['amount'].rolling('20s').sum()
@@ -128,7 +137,6 @@ class rt_bl:
             # id_baseline_PA_df['max_price_index']  = rt_df['price'].rolling_max('20s')#.apply(self.__pct_up_down__, raw=False)
             # id_baseline_PA_df['min_price_index']  = rt_df['price'].rolling_min('20s')#.apply(_pct_up_down_, raw=False)
             # id_baseline_PA_df['pct_up_down'] = id_baseline_PA_df.apply(self.__pct_up_down__)
-
 
         return baseline_PA_df
 
