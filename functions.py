@@ -52,7 +52,7 @@ def get_rt_data(rt=None, src=''):
 
     # rt 对象在主函数生成，传入此函数，添加
     if src == '163':
-        wx.info("[Get_RT_Data] [{}]从 [{}] 交易数据共 [{}] 支股票".format(src, time_str, len(rt.id_arr) ))
+        wx.info("[Get_RT_Data] 从[{}] 查询 [{}]支股票的 交易数据 [{}] ".format(src, len(rt.id_arr), time_str ))
 
     for icount, id in enumerate(rt.id_arr):
         # wx.info("[Get_RT_Data][{}:{}] {} 获取逐笔交易数据[{}]".format(icount+1,len(rt.id_arr),id, time_str))
@@ -138,19 +138,19 @@ def traceback_rt_data(rt=None, src='', date_str = None):
 
     # 股票代码数组，由 rt 对象内部变量 带入
     if rt.id_arr is None:
-        wx.info("[traceback_rt_data] 股票列表为空，退出")
+        wx.info("[Traceback_RT_Data] 股票列表为空，退出")
         return None
 
     # 股票代码数组，由 rt 对象内部变量 带入
     if date_str is None or len(date_str) == 0:
         date_str = (datetime.today()).strftime('%Y%m%d')
-        wx.info("[traceback_rt_data] 未指定回溯的日期，默认使用 {}".format(date_str))
+        wx.info("[Traceback_RT_Data] 未指定回溯的日期，默认使用 {}".format(date_str))
 
     # 起始时间，作为查询实时交易数据的时间节点
     # date_str = '20191216'
-    begin_time_arr = ['09:30','10:30','13:00','14:00']
-    end_time_arr = ['09:35','11:30','14:00','15:00']
-    # end_time_arr = ['10:30','11:30','14:00','15:00']
+    begin_time_arr = ['09:30','10:30','13:00','14:00']#
+    # end_time_arr = ['09:35','11:30','14:00','15:00']
+    end_time_arr = ['10:30','11:30','14:00','15:00']#
 
     baseline_big_deal_df = pd.DataFrame()
     bl = rt_bl()
@@ -165,7 +165,7 @@ def traceback_rt_data(rt=None, src='', date_str = None):
 
             # rt 对象在主函数生成，传入此函数，添加
             if src == '163':
-                wx.info("[Get_RT_Data] [{}]从 [{}] 交易数据共 [{}] 支股票".format(src, time_str, len(rt.id_arr) ))
+                wx.info("[Traceback_RT_Data] 从[{}] 获得[{}] 支股票的交易数据 [{}]-[{}] ".format(src, len(rt.id_arr), date_str, time_str ))
 
             for icount, id in enumerate(rt.id_arr):
                 # wx.info("[Get_RT_Data][{}:{}] {} 获取逐笔交易数据[{}]".format(icount+1,len(rt.id_arr),id, time_str))
@@ -173,12 +173,12 @@ def traceback_rt_data(rt=None, src='', date_str = None):
                 # wx.info("[Get_RT_Data][{}:{}] {} 解析逐笔交易数据[{}]".format(icount+1,len(rt.id_arr),id, time_str))
                 time_range = rt.json_parse(id=id, json_str=json_str)
                 if time_range is None:
-                    wx.info("[Get_RT_Data][{}/{}] [{}] {} 交易数据不存在".format(icount+1,len(rt.id_arr),id, time_str))
+                    wx.info("[Traceback_RT_Data][{}/{}] [{}] [{}-{}] 交易数据不存在".format(icount+1,len(rt.id_arr),id, date_str, time_str))
                 else:
-                    wx.info("[Get_RT_Data][{}/{}] {} [{}--{}]逐笔交易数据[{}]".format(icount+1,len(rt.id_arr),id,time_range[0],time_range[1], time_str))
+                    wx.info("[Traceback_RT_Data][{}/{}] {} [{}--{}]逐笔交易数据[{}-{}]".format(icount+1,len(rt.id_arr),id,time_range[0],time_range[1], date_str, time_str))
                 time.sleep(0.5)
 
-        bl.baseline_PA(rt=rt, date_str=date_str, time_frame_arr=[begin_time_arr[index], end_time_arr[index]])
+        baseline_PA_df = bl.baseline_PA(rt=rt, date_str=date_str, time_frame_arr=[begin_time_arr[index], end_time_arr[index]])
 
         # 大单交易的 基线数据，每个小时产生一次
         # baseline_big_deal_df = bl.baseline_big_deal(rt=rt, date_str=date_str, time_frame_arr=[begin_time_arr[index], end_time_arr[index]])

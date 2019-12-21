@@ -91,7 +91,24 @@ class db_ops:
             df_array[i] = tuple(df_array[i])
             i += 1
         # ['id', 'date', 't_frame', 'big_qty', 'big_abs_pct', 'big_io_pct', 'big_buy_pct', 'big_sell_pct','amount']
-        sql = "REPLACE INTO "+t_name+" SET id=%s, date=%s, t_frame=%s, big_qty=%s, big_abs_pct=%s, big_io_pct=%s, " \
+        sql = "INSERT INTO "+t_name+" SET id=%s, date=%s, t_frame=%s, big_qty=%s, big_abs_pct=%s, big_io_pct=%s, " \
+              "big_buy_pct=%s, big_sell_pct=%s, amount=%s"
+        self.cursor.executemany(sql, df_array)
+        self.handle.commit()
+
+    def db_load_into_RT_BL_PA(self, df = None):
+        wx = lg.get_handle()
+        t_name = self.h_conf.rd_opt('db', 'rt_baseline_PA')
+        if df is None:
+            wx.info("[db_load_into_RT_BL_PA]Err: dataframe is Empty,")
+            return -1
+        df_array = df.values.tolist()
+        i = 0
+        while i < len(df_array):
+            df_array[i] = tuple(df_array[i])
+            i += 1
+        # ['id', 'date', 't_frame', 'big_qty', 'big_abs_pct', 'big_io_pct', 'big_buy_pct', 'big_sell_pct','amount']
+        sql = "INSERT INTO "+t_name+" SET id=%s, date=%s, t_frame=%s, big_qty=%s, big_abs_pct=%s, big_io_pct=%s, " \
               "big_buy_pct=%s, big_sell_pct=%s, amount=%s"
         self.cursor.executemany(sql, df_array)
         self.handle.commit()

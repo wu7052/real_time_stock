@@ -18,17 +18,31 @@ class rt_bl:
         # 大单 金额下限
         self.rt_big_amount = float(self.h_conf.rd_opt('rt_analysis_rules', 'big_deal_amount'))
 
+        # 量价向量 的取样resample的时间段
+        self.rt_PA_resample_secs = self.h_conf.rd_opt('general', 'PA_resample_secs')
+
+        # 去除极值的常量
+        self.mid_constant = float(self.h_conf.rd_opt('general', 'mid_constant'))
+
         self.cq_tname_00 = self.h_conf.rd_opt('db', 'daily_table_cq_00')
         self.cq_tname_30 = self.h_conf.rd_opt('db', 'daily_table_cq_30')
         self.cq_tname_60 = self.h_conf.rd_opt('db', 'daily_table_cq_60')
         self.cq_tname_002 = self.h_conf.rd_opt('db', 'daily_table_cq_002')
         self.cq_tname_68 = self.h_conf.rd_opt('db', 'daily_table_cq_68')
 
+    # time_frame_arr 时间区间，建立一条 量价的数据基线
+    # 量价基线内容：采样频率 20S 一次，计算量价向量长度，统计均值 和 标准差
+    # time_frame_arr ['09:30','10:30'] 起止时间段
 
     def baseline_PA(self, rt=None, date_str=None, time_frame_arr=None):
-        def _pct_up_down_(rt_row):
-
-            return rt_row[0]
+        # def _pct_up_down_(x):
+        #     if x.max == x.min:
+        #         up_down = 0
+        #     elif x.idxmax(axis=0) > x.idxmin(axis=0) : # 高价格 出现时间较晚，上涨
+        #         up_down = 1
+        #     elif x.idxmax(axis=0) < x.idxmin(axis=0): # 高价格 出现时间较早，下跌
+        #         up_down = -1
+        #     return pd.Series(up_down,index=['up_down'])
 
         wx = lg.get_handle()
         if date_str is None or len(date_str) == 0:
@@ -57,33 +71,78 @@ class rt_bl:
 
             # 从RT 数据中筛选出 基线时间段 内的交易记录
             rt_df = rt.rt_dict_df[id].loc[ (rt.rt_dict_df[id]['time_stamp'] >= begin_t_stamp) & ( rt.rt_dict_df[id]['time_stamp'] <= end_t_stamp)].copy()
+            if rt_df is None or len(rt_df) == 0:
+                wx.info("[RT_BL][baseline_PA][{}] 在[{}-{}] 空交易数据，开始处理下一支股票".format(id, time_frame_arr[0], time_frame_arr[1]))
+                continue
             rt_df = rt_df.sort_values(by="time_stamp", ascending=True)
             rt_df['amount'] = rt_df['price']*rt_df['vol']
             rt_df.set_index('pd_time', inplace=True)
+            rt_df['price'] = pd.to_numeric(rt_df['price'])
 
-            rt_df['amount'].resample('120s', how='sum')
-            rt_df['price'].resample('120s', how='min')
-            rt_df['price'].resample('120s', how='max')
-            
+            id_baseline_PA_df['amount'] = rt_df['amount'].resample(self.rt_PA_resample_secs ).sum()
+            id_baseline_PA_df['min_price'] = rt_df['price'].resample(self.rt_PA_resample_secs ).min()
+            id_baseline_PA_df['max_price'] = rt_df['price'].resample(self.rt_PA_resample_secs ).max()
+            id_baseline_PA_df['pct_chg'] = (id_baseline_PA_df['max_price'] / id_baseline_PA_df['min_price'] -1 )*100000000
+
+
+            # Time(Low Price) - Time (High Price) < 0 上涨； >0 下跌
+            id_baseline_PA_df['pct_up_down'] = rt_df['price'].resample(self.rt_PA_resample_secs ).apply(lambda x: x.idxmin()- x.idxmax()
+                                                    if len(x) > 0
+                                                    else (pd.to_datetime(0)-pd.to_datetime(0)))
+
+            id_baseline_PA_df.fillna(0, inplace=True)
+
+            # 過濾掉 成交量 == 0 & 價格變動 ==0 的 時間段記錄
+            id_baseline_PA_df = id_baseline_PA_df.loc[(id_baseline_PA_df['amount'] > 0)&(id_baseline_PA_df['pct_chg'] >0),]
+
+            id_baseline_PA_df['pct_up_down'] = pd.to_numeric(id_baseline_PA_df['pct_up_down'])
+
+
+            id_baseline_PA_df['id'] = id
+            id_baseline_PA_df['t_frame'] = "-".join(time_frame_arr)
+            id_baseline_PA_df['sample_time'] = self.rt_PA_resample_secs
+            # 量价向量长度
+            id_baseline_PA_df['pa_vector'] = pow( pow(id_baseline_PA_df['amount'],2) + pow(id_baseline_PA_df['pct_chg'],2),0.5)
+            # 量价向量方向
+            id_baseline_PA_df['pct_dir'] = id_baseline_PA_df['pct_up_down'].apply(lambda x: x/abs(x) if x != 0 else 0)
+
+            # 上涨向量
+            id_up_baseline_PA_df = id_baseline_PA_df.loc[id_baseline_PA_df['pct_up_down']>0,]
+            id_up_baseline_PA_df = self._pa_df_(id_up_baseline_PA_df)
+
+            # 下跌向量
+            id_down_baseline_PA_df = id_baseline_PA_df.loc[id_baseline_PA_df['pct_up_down']<0,]
+            id_down_baseline_PA_df = self._pa_df_(id_down_baseline_PA_df)
+
+            if baseline_PA_df.empty or baseline_PA_df is None:
+                baseline_PA_df = id_up_baseline_PA_df
+                baseline_PA_df = baseline_PA_df.append(id_down_baseline_PA_df)
+
+            else:
+                baseline_PA_df = baseline_PA_df.append(id_up_baseline_PA_df)
+                baseline_PA_df = baseline_PA_df.append(id_down_baseline_PA_df)
+
+            # 使用rolling 滑动窗口 取样，放弃这种方式
             # id_baseline_PA_df['amount'] = rt_df['amount'].rolling('20s').sum()
             # id_baseline_PA_df['max_price_index']  = pd.rolling_max(rt_df['price'], freq='20s')#.apply(self.__pct_up_down__, raw=False)
             # id_baseline_PA_df['max_price_index']  = rt_df['price'].rolling_max('20s')#.apply(self.__pct_up_down__, raw=False)
             # id_baseline_PA_df['min_price_index']  = rt_df['price'].rolling_min('20s')#.apply(_pct_up_down_, raw=False)
             # id_baseline_PA_df['pct_up_down'] = id_baseline_PA_df.apply(self.__pct_up_down__)
-            id_baseline_PA_df['id'] = id
-            id_baseline_PA_df['t_frame'] = "-".join(time_frame_arr)
-            if baseline_PA_df.empty or baseline_PA_df is None:
-                baseline_PA_df = id_baseline_PA_df
-            else:
-                baseline_PA_df = baseline_PA_df.append(id_baseline_PA_df)
 
 
         return baseline_PA_df
 
+    #  去除 量价向量的 极值，返回均值范围内的dataframe
+    def _pa_df_(self, pa_df=None):
+        vec_ave = pa_df['pa_vector'].mean()
+        vec_std = pa_df['pa_vector'].std()
+        vec_max = vec_ave + self.mid_constant * vec_std
+        vec_min = vec_ave - self.mid_constant * vec_std
+        pa_df = pa_df.loc[ (pa_df['pa_vector']<=vec_max )&(pa_df['pa_vector']>=vec_min),]
+        return pa_df
 
-
+    # time_frame_arr 时间区间，建立一条 大单交易的数据基线
     # 建立成交量、大单数量、大单金额占比 的基线数据，并导入数据库
-    # 每天4个小时建立四条基线，方便同比\环比
     # time_frame_arr ['09:30','10:30'] 起止时间段
     def baseline_big_deal(self, rt=None , date_str=None, time_frame_arr=None ):
         wx = lg.get_handle()
@@ -180,11 +239,19 @@ class rt_bl:
     def db_load_baseline_big_deal(self, df = None):
         wx = lg.get_handle()
         if df is None or df.empty:
-            wx.info("[RT_BL][db_load_baseline_big_deal] 导入数据DataFrame 为空，退出")
+            wx.info("[RT_BL][db_load_baseline_big_deal] 大单交易数据 DataFrame 为空，退出")
             return
         self.db.db_load_into_RT_BL_Big_Deal(df=df)
         wx.info("[RT_BL][db_load_baseline_big_deal] 大单交易数据{}条 导入数据库完成".format(len(df)))
 
+
+    def db_load_baseline_PA(self, df = None):
+        wx = lg.get_handle()
+        if df is None or df.empty:
+            wx.info("[RT_BL][db_load_baseline_PA] 量价数据 DataFrame 为空，退出")
+            return
+        self.db.db_load_into_RT_BL_PA(df=df)
+        wx.info("[RT_BL][db_load_baseline_big_PA] 量价数据{}条 导入数据库完成".format(len(df)))
 
 
 

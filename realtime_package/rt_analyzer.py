@@ -10,8 +10,8 @@ from msg_package import f_msg
 class rt_ana:
     def __init__(self):
         h_conf = conf_handler(conf="rt_analyer.conf")
-        rt_ana_time_slice = h_conf.rd_opt('general', 'rt_ana_time_slice')
-        self.rt_ana_time_slice_arr = rt_ana_time_slice.split(',')
+        ana_time_slice = h_conf.rd_opt('rt_analysis_rules', 'ana_time_slice')
+        self.ana_time_slice_arr = ana_time_slice.split(',')
         self.rt_big_amount = float(h_conf.rd_opt('rt_analysis_rules','big_deal_amount'))
         self.msg = f_msg()
 
@@ -32,7 +32,7 @@ class rt_ana:
         sliced_ana_ret_df_2 = pd.DataFrame()  # 保存切片的 每分钟成交量、每0.01% 振幅的成交量 统计结果
 
         # 所有被监控的股票 一起按时间段切片，然后再调用 分析函数
-        for t_slice in self.rt_ana_time_slice_arr:
+        for t_slice in self.ana_time_slice_arr:
             sliced_rt_df = pd.DataFrame() # 开始切片前，清空初始化
             for key in rt_dict_df:
                 sliced_tmp = self.rt_df_slice(rt_df=rt_dict_df[key], t_slice= int(t_slice))
@@ -154,7 +154,7 @@ class rt_ana:
 
         pass
 
-    # 对实时交易Dataframe 按照 conf 文件中的 rt_ana_time_slice 切片
+    # 对实时交易Dataframe 按照 conf 文件中的 ana_time_slice 切片
     def rt_df_slice(self, rt_df = None, t_slice=0):
         wx = lg.get_handle()
         if rt_df is None:
