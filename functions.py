@@ -178,11 +178,15 @@ def traceback_rt_data(rt=None, src='', date_str = None):
                     wx.info("[Traceback_RT_Data][{}/{}] {} [{}--{}]逐笔交易数据[{}-{}]".format(icount+1,len(rt.id_arr),id,time_range[0],time_range[1], date_str, time_str))
                 time.sleep(0.5)
 
+        # 量价 基线数据，每个小时产生一次
         baseline_PA_df = bl.baseline_PA(rt=rt, date_str=date_str, time_frame_arr=[begin_time_arr[index], end_time_arr[index]])
+        # 导入数据库
+        bl.db_load_baseline_PA(df=baseline_PA_df)
 
         # 大单交易的 基线数据，每个小时产生一次
         # baseline_big_deal_df = bl.baseline_big_deal(rt=rt, date_str=date_str, time_frame_arr=[begin_time_arr[index], end_time_arr[index]])
         # 导入数据库
         # bl.db_load_baseline_big_deal(df = baseline_big_deal_df)
+
         # 释放 RT 对象的内部变量，只保留 最后30分钟的交易数据
-        # rt.clr_rt_data(minutes=30)
+        rt.clr_rt_data(minutes=30)

@@ -116,8 +116,8 @@ class rt_bl:
             id_down_baseline_PA_df = id_baseline_PA_df.loc[id_baseline_PA_df['pct_up_down']<0,]
             if id_down_baseline_PA_df is not None and len(id_down_baseline_PA_df) >0:
                 id_down_baseline_PA_df = self._pa_df_(id_down_baseline_PA_df)
-                id_down_bl_PA_ave = id_up_baseline_PA_df['pa_vector'].mean()
-                id_down_bl_PA_std = id_up_baseline_PA_df['pa_vector'].std()
+                id_down_bl_PA_ave = id_down_baseline_PA_df['pa_vector'].mean()
+                id_down_bl_PA_std = id_down_baseline_PA_df['pa_vector'].std()
             else:
                 id_down_bl_PA_ave = 0
                 id_down_bl_PA_std = 0
@@ -137,8 +137,17 @@ class rt_bl:
             # id_baseline_PA_df['max_price_index']  = rt_df['price'].rolling_max('20s')#.apply(self.__pct_up_down__, raw=False)
             # id_baseline_PA_df['min_price_index']  = rt_df['price'].rolling_min('20s')#.apply(_pct_up_down_, raw=False)
             # id_baseline_PA_df['pct_up_down'] = id_baseline_PA_df.apply(self.__pct_up_down__)
+        if baseline_PA_df is None or baseline_PA_df.empty:
+            wx.info("[RT_BL][baseline_PA] [{}-{}] 量价基线交易数据为空，退出".format(time_frame_arr[0], time_frame_arr[1]))
+            return None
+        else:
+            cols = ['id', 'date', 't_frame', 'sample_time', 'up_bl_pa_ave', 'up_bl_pa_std', 'down_bl_pa_ave', 'down_bl_pa_std']
+            baseline_PA_df = baseline_PA_df.loc[:, cols]
+            baseline_PA_df.fillna(0, inplace=True)
+            baseline_PA_df.reset_index(drop=True, inplace=True)
+            wx.info("[RT_BL][baseline_PA] [{}-{}] 量价数据基线更新完毕".format(time_frame_arr[0], time_frame_arr[1]))
+            return baseline_PA_df
 
-        return baseline_PA_df
 
     #  去除 量价向量的 极值，返回均值范围内的dataframe
     def _pa_df_(self, pa_df=None):
@@ -233,7 +242,7 @@ class rt_bl:
                 baseline_big_deal_df = baseline_big_deal_df.append(pd.DataFrame([rt_baseline]))
 
         if baseline_big_deal_df is None or baseline_big_deal_df.empty:
-            wx.info("[RT_BL][baseline_big_deal] [{}-{}] 基线交易数据为空，退出".format(time_frame_arr[0], time_frame_arr[1]))
+            wx.info("[RT_BL][baseline_big_deal] [{}-{}] 大单基线交易数据为空，退出".format(time_frame_arr[0], time_frame_arr[1]))
             return None
         else:
             cols = ['id','date','t_frame','big_qty','big_abs_pct','big_io_pct','big_buy_pct','big_sell_pct','amount']
