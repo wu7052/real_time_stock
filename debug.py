@@ -29,7 +29,7 @@ rt163 = rt_163(id_arr=id_arr, date_str='')
 # rt实时对象，src 数据源
 # 利用全局RT 对象完成 数据收集
 # 创建BL 对象完成 基线设定、导入数据库
-traceback_rt_data(rt=rt163, src='163', date_str = '20191220')
+traceback_rt_data(rt=rt163, src='163', date_str = '')
 
 
 # rt163.clr_rt_data(minutes=0)

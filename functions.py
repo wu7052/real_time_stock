@@ -148,9 +148,9 @@ def traceback_rt_data(rt=None, src='', date_str = None):
 
     # 起始时间，作为查询实时交易数据的时间节点
     # date_str = '20191216'
-    begin_time_arr = ['09:30','10:30','13:00','14:00']#
+    begin_time_arr = ['13:05','14:05']#'09:30','10:35',
     # end_time_arr = ['09:35','11:30','14:00','15:00']
-    end_time_arr = ['10:30','11:30','14:00','15:00']#
+    end_time_arr = ['14:00','15:00']#'10:30','11:30',
 
     baseline_big_deal_df = pd.DataFrame()
     bl = rt_bl()
@@ -184,9 +184,9 @@ def traceback_rt_data(rt=None, src='', date_str = None):
         bl.db_load_baseline_PA(df=baseline_PA_df)
 
         # 大单交易的 基线数据，每个小时产生一次
-        # baseline_big_deal_df = bl.baseline_big_deal(rt=rt, date_str=date_str, time_frame_arr=[begin_time_arr[index], end_time_arr[index]])
+        baseline_big_deal_df = bl.baseline_big_deal(rt=rt, date_str=date_str, time_frame_arr=[begin_time_arr[index], end_time_arr[index]])
         # 导入数据库
-        # bl.db_load_baseline_big_deal(df = baseline_big_deal_df)
+        bl.db_load_baseline_big_deal(df = baseline_big_deal_df)
 
         # 释放 RT 对象的内部变量，只保留 最后30分钟的交易数据
         rt.clr_rt_data(minutes=30)
