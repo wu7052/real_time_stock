@@ -130,7 +130,7 @@ class rt_163:
                             4: 'time_stamp', 5: 'time_str'}, inplace=True)
         ret_time_arr = [df1.time_str.min(), df1.time_str.max()]
         if id in self.rt_dict_df.keys():
-            self.rt_dict_df[id] = self.rt_dict_df[id].append(df1).drop_duplicates()
+            self.rt_dict_df[id] = self.rt_dict_df[id].append(df1, sort=False).drop_duplicates()
             self.rt_dict_df[id] = self.rt_dict_df[id].sort_values(by="time_str", ascending=False)
         else:
             self.rt_dict_df[id] = df1

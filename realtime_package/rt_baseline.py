@@ -85,8 +85,8 @@ class rt_bl:
             id_baseline_PA_df['pct_chg'] = (id_baseline_PA_df['max_price'] / id_baseline_PA_df['min_price'] -1 )*100000000
 
 
-            # Time(Low Price) - Time (High Price) < 0 上涨； >0 下跌
-            id_baseline_PA_df['pct_up_down'] = rt_df['price'].resample(self.rt_PA_resample_secs ).apply(lambda x: x.idxmin()- x.idxmax()
+            # Time(High Price) - Time (Low Price) > 0 上涨； >0 下跌, （高价时间 - 低价时间）
+            id_baseline_PA_df['pct_up_down'] = rt_df['price'].resample(self.rt_PA_resample_secs ).apply(lambda x: x.idxmax()- x.idxmin()
                                                     if len(x) > 0
                                                     else (pd.to_datetime(0)-pd.to_datetime(0)))
 
@@ -105,12 +105,17 @@ class rt_bl:
             # 上涨向量，去极值后，求均值 标准差
             id_up_baseline_PA_df = id_baseline_PA_df.loc[id_baseline_PA_df['pct_up_down']>0,]
             if id_up_baseline_PA_df is not None and len(id_up_baseline_PA_df) >0:
-                id_up_baseline_PA_df = self._pa_df_(id_up_baseline_PA_df)
-                id_up_bl_PA_ave = id_up_baseline_PA_df['pa_vector'].mean()
-                id_up_bl_PA_std = id_up_baseline_PA_df['pa_vector'].std()
+                id_up_baseline_PA_df = self._pa_df_(id_up_baseline_PA_df) # 去极值函数（1倍标准差范围内的向量），获得计算均值的Dataframe
+                id_up_bl_PA_ave = id_up_baseline_PA_df['pa_vector'].mean() # 向量长度均值
+                id_up_bl_PA_std = id_up_baseline_PA_df['pa_vector'].std()  # 向量长度标准差
+                id_up_bl_pct_ave = id_up_baseline_PA_df['pct_chg'].mean()  # 涨幅均值
+                id_up_bl_amount_ave = id_up_baseline_PA_df['amount'].mean()  # 涨幅均值
+
             else:
                 id_up_bl_PA_ave = 0
                 id_up_bl_PA_std = 0
+                id_up_bl_pct_ave = 0
+                id_up_bl_amount_ave = 0
 
             # 下跌向量，去极值后，求均值 标准差
             id_down_baseline_PA_df = id_baseline_PA_df.loc[id_baseline_PA_df['pct_up_down']<0,]
@@ -118,13 +123,20 @@ class rt_bl:
                 id_down_baseline_PA_df = self._pa_df_(id_down_baseline_PA_df)
                 id_down_bl_PA_ave = id_down_baseline_PA_df['pa_vector'].mean()
                 id_down_bl_PA_std = id_down_baseline_PA_df['pa_vector'].std()
+                id_down_bl_pct_ave = id_up_baseline_PA_df['pct_chg'].mean()  # 涨幅均值
+                id_down_bl_amount_ave = id_up_baseline_PA_df['amount'].mean()  # 涨幅均值
+
             else:
                 id_down_bl_PA_ave = 0
                 id_down_bl_PA_std = 0
+                id_down_bl_pct_ave = 0
+                id_down_bl_amount_ave = 0
 
             pa_baseline = {"id":id, "date":date_str,"t_frame":"-".join(time_frame_arr), "sample_time":self.rt_PA_resample_secs,
                            "up_bl_pa_ave":id_up_bl_PA_ave, "up_bl_pa_std":id_up_bl_PA_std,
-                           "down_bl_pa_ave":id_down_bl_PA_ave, "down_bl_pa_std":id_down_bl_PA_std}
+                           "up_bl_pct_ave":id_up_bl_pct_ave , "up_bl_amount_ave":id_up_bl_amount_ave ,
+                           "down_bl_pa_ave":id_down_bl_PA_ave, "down_bl_pa_std":id_down_bl_PA_std,
+                           "down_bl_pct_ave": id_down_bl_pct_ave, "down_bl_amount_ave": id_down_bl_amount_ave}
 
             if baseline_PA_df is None or baseline_PA_df.empty:
                 baseline_PA_df = pd.DataFrame([pa_baseline])
@@ -141,7 +153,9 @@ class rt_bl:
             wx.info("[RT_BL][baseline_PA] [{}-{}] 量价基线交易数据为空，退出".format(time_frame_arr[0], time_frame_arr[1]))
             return None
         else:
-            cols = ['id', 'date', 't_frame', 'sample_time', 'up_bl_pa_ave', 'up_bl_pa_std', 'down_bl_pa_ave', 'down_bl_pa_std']
+            cols = ['id', 'date', 't_frame', 'sample_time',
+                    'up_bl_pa_ave', 'up_bl_pa_std','up_bl_pct_ave','up_bl_amount_ave',
+                    'down_bl_pa_ave', 'down_bl_pa_std','down_bl_pct_ave','down_bl_amount_ave']
             baseline_PA_df = baseline_PA_df.loc[:, cols]
             baseline_PA_df.fillna(0, inplace=True)
             baseline_PA_df.reset_index(drop=True, inplace=True)

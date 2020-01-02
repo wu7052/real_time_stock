@@ -107,9 +107,12 @@ class db_ops:
         while i < len(df_array):
             df_array[i] = tuple(df_array[i])
             i += 1
-        # cols = ['id', 'date', 't_frame', 'sample_time', 'up_bl_pa_ave', 'up_bl_pa_std', 'down_bl_pa_ave', 'down_bl_pa_std']
+        # cols = ['id', 'date', 't_frame', 'sample_time',
+        #                     'up_bl_pa_ave', 'up_bl_pa_std','up_bl_pct_ave','up_bl_amount_ave',
+        #                     'down_bl_pa_ave', 'down_bl_pa_std','down_bl_pct_ave','down_bl_amount_ave']
 
         sql = "INSERT INTO "+t_name+" SET id=%s, date=%s, t_frame=%s, sample_time=%s, up_bl_pa_ave=%s, " \
-                                    "up_bl_pa_std=%s, down_bl_pa_ave=%s, down_bl_pa_std=%s"
+                                    "up_bl_pa_std=%s, up_bl_pct_ave=%s, up_bl_amount_ave=%s," \
+                                    "down_bl_pa_ave=%s, down_bl_pa_std=%s, down_bl_pct_ave=%s, down_bl_amount_ave=%s"
         self.cursor.executemany(sql, df_array)
         self.handle.commit()
