@@ -6,7 +6,7 @@ import new_logger as lg
 lg._init_()
 wx = lg.get_handle()
 from stock_package import ts_data
-from realtime_package import rt_163
+from realtime_package import rt_163, rt_bl
 
 # import pandas as pd
 # from assess_package import back_trader
@@ -26,10 +26,14 @@ id_arr = xl_h.get_stock_id_from_conf()
 
 rt163 = rt_163(id_arr=id_arr, date_str='')
 
+# get_rt_data(rt=rt163, src='163', date_str='')
+
+# bl = rt_bl()
+# bl.get_baseline_big_deal()
 # rt实时对象，src 数据源
 # 利用全局RT 对象完成 数据收集
 # 创建BL 对象完成 基线设定、导入数据库
-traceback_rt_data(rt=rt163, src='163', date_str = '')
+rebase_rt_data(rt=rt163, src='163', date_str = '')
 
 
 # rt163.clr_rt_data(minutes=0)

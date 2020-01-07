@@ -1,7 +1,8 @@
+from tushare_data import ts_data
+import re
 from db_package import db_ops
 from conf import conf_handler
 import new_logger as lg
-import re
 from datetime import datetime, timedelta
 import pandas as pd
 import time
@@ -10,7 +11,7 @@ from jsonpath import jsonpath
 import urllib3
 import chardet
 from urllib import parse
-from tushare_data import ts_data
+import os
 
 class rt_163:
     def __init__(self, id_arr=None, date_str = None): #,, items_page=200):  time_frame=180):
@@ -23,10 +24,13 @@ class rt_163:
         #     self.items_page = items_page
         #     self.t_frame = time_frame
 
-        if date_str is None:
-            self.date_str = (datetime.today()).strftime('%Y-%m-%d')
+        if date_str is None or len(date_str) == 0:
+            self.date_str = (datetime.today()).strftime('%Y%m%d')
         else:
             self.date_str = date_str
+
+        self.f_record_name = self.date_str+"_163"
+        self.f_record = open(self.f_record_name, "a+")
 
         # DataFrame 字典， key = id, value = Dataframe
         # 用来保存 通过rt_163获取的各股票的实时数据DataFrame
@@ -41,7 +45,36 @@ class rt_163:
         # 大单 金额下限
         # self.rt_big_amount = float(self.h_conf.rd_opt('rt_analysis_rules', 'big_deal_amount'))
 
+    def __del__(self):
+        self.f_record.close()
 
+    def _get_last_record_(self):
+        """
+        get last line of a file
+        :param filename: file name
+        :return: last line or None for empty file
+        """
+        wx = lg.get_handle()
+        try:
+            filesize = os.path.getsize(self.f_record_name)
+            if filesize == 0:
+                return None
+            else:
+                with open(self.f_record_name, 'rb') as fp:  # to use seek from end, must use mode 'rb'
+                    offset = -5  # initialize offset
+                    while -offset < filesize:  # offset cannot exceed file size
+                        fp.seek(offset, 2)  # read # offset chars from eof(represent by number '2')
+                        lines = fp.readlines()  # read from fp to eof
+                        if len(lines) >= 2:  # if contains at least 2 lines
+                            return lines[-1].decode()  # then last line is totally included
+                        else:
+                            offset *= 2  # enlarge offset
+                    fp.seek(0)
+                    lines = fp.readlines()
+                    return lines[-1].decode()
+        except FileNotFoundError:
+            wx.info(self.f_record_name + ' not found!')
+            return None
 
     # 添加监控的股票
     def add_id(self, id = None):
@@ -109,6 +142,9 @@ class rt_163:
             return None
         if json_str is not None:
             json_obj = json.loads(json_str)
+        if json_obj is None:
+            wx.info("[RT_163][json_parse] JSON 对象为空，退出")
+            return None
         begin_time_str = json_obj['begin']
         end_time_str = json_obj['end']
         if len(json_obj['zhubi_list']) == 0:
@@ -134,11 +170,17 @@ class rt_163:
             self.rt_dict_df[id] = self.rt_dict_df[id].sort_values(by="time_str", ascending=False)
         else:
             self.rt_dict_df[id] = df1
+
         return ret_time_arr
 
-        # df1 = self.rt_dict_df[id].drop_duplicates()
-        # return df1
 
-        # df = df.drop_duplicates( subset = ['YJML', 'EJML', 'SJML', 'WZLB', 'GGXHPZ', 'CGMS'],# 去重列，按这些列进行去重
-        # 　　keep = 'first'  # 保存第一条重复数据
-        # )
+    # 废弃函数， 使用 _get_last_record_ 代替
+    def get_lastest_stamp(self):
+        wx = lg.get_handle()
+        t_stamp_arr  = []
+        if self.rt_dict_df is None or len(self.rt_dict_df) == 0:
+            begin_t_stamp = int(time.mktime(time.strptime(self.date_str+"09:30", "%Y%m%d%H:%M")))
+            return begin_t_stamp
+        for key in self.rt_dict_df.keys():
+            t_stamp_arr.append( self.rt_dict_df[key]['time_stamp'].max() )
+        return max(t_stamp_arr)

@@ -90,9 +90,13 @@ class db_ops:
         while i < len(df_array):
             df_array[i] = tuple(df_array[i])
             i += 1
-        # ['id', 'date', 't_frame', 'big_qty', 'big_abs_pct', 'big_io_pct', 'big_buy_pct', 'big_sell_pct','amount']
-        sql = "INSERT INTO "+t_name+" SET id=%s, date=%s, t_frame=%s, big_qty=%s, big_abs_pct=%s, big_io_pct=%s, " \
-              "big_buy_pct=%s, big_sell_pct=%s, amount=%s"
+
+        # cols = ['id', 'date', 't_frame', 'big_qty', 'big_abs_pct', 'big_io_pct', 'big_buy_pct', 'big_sell_pct',
+        #         'amount', 'sell_qty', 'sell_amount', 'buy_qty', 'buy_amount', 'air_qty', 'air_amount']
+
+        sql = "REPLACE INTO "+t_name+" SET id=%s, date=%s, t_frame=%s, big_qty=%s, big_abs_pct=%s, big_io_pct=%s, " \
+              "big_buy_pct=%s, big_sell_pct=%s, amount=%s, sell_qty=%s, sell_amount=%s, buy_qty=%s, buy_amount=%s," \
+                                    "air_qty=%s, air_amount=%s"
         self.cursor.executemany(sql, df_array)
         self.handle.commit()
 
@@ -107,12 +111,34 @@ class db_ops:
         while i < len(df_array):
             df_array[i] = tuple(df_array[i])
             i += 1
-        # cols = ['id', 'date', 't_frame', 'sample_time',
-        #                     'up_bl_pa_ave', 'up_bl_pa_std','up_bl_pct_ave','up_bl_amount_ave',
-        #                     'down_bl_pa_ave', 'down_bl_pa_std','down_bl_pct_ave','down_bl_amount_ave']
 
-        sql = "INSERT INTO "+t_name+" SET id=%s, date=%s, t_frame=%s, sample_time=%s, up_bl_pa_ave=%s, " \
-                                    "up_bl_pa_std=%s, up_bl_pct_ave=%s, up_bl_amount_ave=%s," \
-                                    "down_bl_pa_ave=%s, down_bl_pa_std=%s, down_bl_pct_ave=%s, down_bl_amount_ave=%s"
+        # cols = ['id', 'date', 't_frame', 'sample_time',
+        #         'up_bl_pa_ave', 'up_bl_pa_std', 'up_bl_pa_angle_ave',
+        #         'up_bl_pa_angle_std', 'up_bl_pct_ave', 'up_bl_amount_ave',
+        #         'down_bl_pa_ave', 'down_bl_pa_std', 'down_bl_pa_angle_ave',
+        #         'down_bl_pa_angle_std', 'down_bl_pct_ave', 'down_bl_amount_ave']
+
+        # sql = "INSERT INTO "+t_name+" SET id=%s, date=%s, t_frame=%s, sample_time=%s, " \
+        #                             "up_bl_pa_ave=%s, up_bl_pa_std=%s, up_bl_pa_ang_ave=%s, " \
+        #                             "up_bl_pa_ang_std=%s, up_bl_pct_ave=%s, up_bl_amount_ave=%s," \
+        #                             "down_bl_pa_ave=%s, down_bl_pa_std=%s, down_bl_pa_ang_ave=%s, " \
+        #                             "down_bl_pa_ang_std=%s, down_bl_pct_ave=%s, down_bl_amount_ave=%s"
+        sql = "REPLACE INTO "+t_name+" SET id=%s, date=%s, t_frame=%s, sample_time=%s, " \
+                                    "up_bl_pa_ave=%s, up_bl_pa_ang_ave=%s, " \
+                                    "up_bl_pct_ave=%s, up_bl_amount_ave=%s," \
+                                    "down_bl_pa_ave=%s, down_bl_pa_ang_ave=%s, " \
+                                    "down_bl_pct_ave=%s, down_bl_amount_ave=%s"
         self.cursor.executemany(sql, df_array)
         self.handle.commit()
+
+    def get_bl_big_deal(self, days=3):
+        wx = lg.get_handle()
+        t_name = self.h_conf.rd_opt('db', 'rt_baseline_big')
+        sql = "select distinct date from "+t_name+"  order by date desc limit "+str(days)
+        date_df = self._exec_sql(sql = sql)
+        data_arr = date_df.date.values.tolist()
+        date_str = ",".join(data_arr)
+
+        sql = "select * from "+t_name+" where date in ("+date_str+")"
+        ret_df = self._exec_sql(sql=sql)
+        return ret_df

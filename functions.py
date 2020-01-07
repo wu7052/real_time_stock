@@ -1,11 +1,10 @@
-from realtime_package import rt_163, rt_east, rt_sina, rt_ana, rt_bl
+from realtime_package import rt_163, rt_east, rt_sina, rt_ana, rt_bl, wx_timer
 import pandas as pd
 from datetime import datetime, timedelta
 import time
 import new_logger as lg
-from conf import conf_handler, xl_handler
-from db_package import db_ops
 
+"""
 # 计时器 装饰器
 def wx_timer(func):
     def wrapper(*args, **kwargs):
@@ -17,7 +16,7 @@ def wx_timer(func):
         wx.info("{} used {:.2f} seconds".format(func.__name__, time_used))
 
     return wrapper  # 这个语句 不属于 wrapper(), 而是 wx_timer 的返回值. 对应 func 后面这个()调用
-
+"""
 
 # 计时器 装饰器
 def wx_timer_ret(func):
@@ -32,108 +31,98 @@ def wx_timer_ret(func):
     return wrapper  # 这个语句 不属于 wrapper(), 而是 wx_timer 的返回值. 对应 func 后面这个()调用
 
 
-
-
 # 获取实时数据
 # src 数据源 ， t_frame 读取间隔时间， id_arr 股票ID代码数组
-def get_rt_data(rt=None, src=''):
+def get_rt_data(rt=None, src='', date_str=''):
     wx = lg.get_handle()
 
     # 股票代码数组，由 rt 对象内部变量 带入
     if rt.id_arr is None:
-        wx.info("[Get_RT_Data] 股票列表为空，退出")
+        wx.info("[Get_RT_Data]: 股票列表为空，退出")
         return None
 
+    if date_str is None or len(date_str) == 0:
+        date_str = (datetime.today()).strftime('%Y%m%d')
+        wx.info("[Get_RT_Data] 未指定交易日期，默认使用 {}".format(date_str))
+
+    my_timer = wx_timer()
+
+    # 判断 今日期 是否交易日
+    if my_timer.is_trading_date(date_str=date_str):
+        wx.info("今天是交易日，继续运行")
+    else:
+        wx.info("[Get_RT_Data]:{}不是交易日，退出实时交易数据获取 ".format(date_str))
+        return None
+
+    time_inc = 5  # 5分钟增量
+
+    # 从记录文件读取最近一次获取实时交易的时间
+    # 记录文件名：日期_数据来源
+    begin_time_str = rt._get_last_record_()
+    if begin_time_str is None :
+        begin_time_str = '09:25'
+
+    # 开始 获取实时交易的时间起点，并判断时间是否在交易时间
+    begin_time_stamp = int(time.mktime(time.strptime(date_str+begin_time_str, "%Y%m%d%H:%M"))) + time_inc*60
+    ret_zone = my_timer.tell_time_zone(t_stamp = begin_time_stamp)
+    if ret_zone[0] < 0:
+        begin_time_stamp = ret_zone[1]
+
+    # 当前时间，如果超出交易时间，则拉回到 交易时间
+    end_time_stamp = int(time.time())
+    ret_zone = my_timer.tell_time_zone(t_stamp = end_time_stamp)
+    if ret_zone[0] < 0:
+        end_time_stamp = ret_zone[1]
+
+    if begin_time_stamp > end_time_stamp:
+        wx.info("[Get_RT_Data] 查询间隔不足5分钟，需等待{}秒".format(begin_time_stamp-end_time_stamp))
+        time.sleep(begin_time_stamp-end_time_stamp)
+
+    while begin_time_stamp <= end_time_stamp:
+        time_str = time.strftime("%H:%M:%S", time.localtime(begin_time_stamp))
+        # rt 对象在主函数生成，传入此函数，添加
+        if src == '163':
+            wx.info("[Get_RT_Data] 从[{}] 查询 [{}]支股票的 交易数据 [{}] ".format(src, len(rt.id_arr), time_str))
+
+        for icount, id in enumerate(rt.id_arr):
+            # wx.info("[Get_RT_Data][{}:{}] {} 获取逐笔交易数据[{}]".format(icount+1,len(rt.id_arr),id, time_str))
+            json_str = rt.get_json_str(id=id, time_str=time_str)
+            # wx.info("[Get_RT_Data][{}:{}] {} 解析逐笔交易数据[{}]".format(icount+1,len(rt.id_arr),id, time_str))
+            time_range = rt.json_parse(id=id, json_str=json_str)
+            if time_range is None:
+                wx.info("[Get_RT_Data][{}/{}] {} [{}]逐笔交易数据 为空".format(icount + 1, len(rt.id_arr), id, time_str))
+            else:
+                wx.info("[Get_RT_Data][{}/{}] {} [{}--{}]逐笔交易数据[{}]".format(icount + 1, len(rt.id_arr), id, time_range[0],
+                                                                            time_range[1], time_str))
+
+        begin_time_stamp += time_inc*60
+        ret_zone = my_timer.tell_time_zone(t_stamp=begin_time_stamp)
+        if ret_zone[0] == -3:
+            begin_time_stamp = ret_zone[1]
+
+        # begin_time_stamp == end_time_stamp 再进行一次循环
+        # begin_time_stamp > end_time_stamp 且差值 在 time_inc * 60 秒内，设置 begin == end
+        if begin_time_stamp - end_time_stamp > 0 and begin_time_stamp-end_time_stamp < time_inc*60:
+            begin_time_stamp = end_time_stamp
+
+    # 文件记录最近一次的实时交易数据时间
+    rt.f_record.write('\n'+time_str[:5])
+
     # 获得当前时间，作为查询实时交易数据的时间节点
-    time_str = time.strftime("%H:%M:%S", time.localtime())
+    # time_str = time.strftime("%H:%M:%S", time.localtime())
     # time_str = (datetime.datetime.now()).strftime("%H:%M:%S")
     # 时间偏移到交易时间，测试用途
-    # time_str = (datetime.now()+timedelta(hours=-6)).strftime("%H:%M:%S")
-
-    # rt 对象在主函数生成，传入此函数，添加
-    if src == '163':
-        wx.info("[Get_RT_Data] 从[{}] 查询 [{}]支股票的 交易数据 [{}] ".format(src, len(rt.id_arr), time_str ))
-
-    for icount, id in enumerate(rt.id_arr):
-        # wx.info("[Get_RT_Data][{}:{}] {} 获取逐笔交易数据[{}]".format(icount+1,len(rt.id_arr),id, time_str))
-        json_str = rt.get_json_str(id=id, time_str=time_str)
-        # wx.info("[Get_RT_Data][{}:{}] {} 解析逐笔交易数据[{}]".format(icount+1,len(rt.id_arr),id, time_str))
-        time_range = rt.json_parse(id=id, json_str=json_str)
-        wx.info("[Get_RT_Data][{}/{}] {} [{}--{}]逐笔交易数据[{}]".format(icount+1,len(rt.id_arr),id,time_range[0],time_range[1], time_str))
+    # time_str = (datetime.now()+timedelta(hours=-11)).strftime("%H:%M:%S")
 
 
 def ana_rt_data(ana=None, rt=None):
     ana.rt_analyzer(rt = rt)
 
-# 重新设定 实时数据的基线
-def rebase_rt_data(id_arr = None, rt=None):
-    wx = lg.get_handle()
-    db = db_ops()
-    h_conf = conf_handler(conf="rt_analyer.conf")
-    rt_big_amount = float(h_conf.rd_opt('rt_analysis_rules', 'big_deal_amount'))
-
-    if rt is None or rt.empty:
-        wx.info("[rebase_rt_data]基线设定：实时数据DataFrame为空，退出")
-        return
-
-    for id in rt.rt_dict_df.keys():
-        # 如果指定了 股票id，
-        if id_arr is not None and id not in id_arr:
-            wx.info("[rebase_rt_data]已指定需更新基线的股票代码，[{}]不是指定的股票代码".format(id))
-            continue
-        else:
-            rt_df = rt.rt_dict_df[id]
-            rt_end_time = rt_df['time_stamp'].max()
-            rt_begin_time = rt_df['time_stamp'].min()
-            rt_begin_timestr = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(rt_begin_time))
-            rt_end_timestr = time.strftime("%H:%M:%S", time.localtime(rt_end_time))
-            wx.info("[rebase_rt_data]开始更新[{}]的数据基线[{}--{}]".format(id, rt_begin_timestr, rt_end_timestr))
-            rt_date_str = time.strftime("%Y%m%d", time.localtime(rt_begin_time))
-
-            # ID 的所有成交量
-            rt_df['amount'] = rt_df['vol'] * rt_df['price']
-            rt_df['io_amount'] = rt_df['amount'] * rt_df['type']
-            rt_amount = rt_df['amount'].sum()
-
-            # 成交明细中的 大单列表
-            rt_big_df = rt_df.loc[rt_df['amount'] >= rt_big_amount,]
-            # 大单的数量
-            rt_big_qty = len(rt_big_df)
-            # 大单买入、卖出金额合计
-            rt_big_amount_sum_abs = rt_big_df['amount'].sum()
-            # 大单买入 卖出对冲后的金额
-            rt_big_amount_sum_io = rt_big_df['io_amount'].sum()
-
-            # 大单金额 占 总成交量的比例
-            big_amount_pct = rt_big_amount_sum_abs/rt_amount
-
-            # 平均每分钟的 大单买入、卖出金额
-            rt_ave_big_amount_per_min_abs = rt_big_amount_sum_abs/((rt_end_time-rt_begin_time)/60)
-
-            # 卖盘的 大单金额
-            rt_big_sell_df = rt_big_df.loc[(rt_big_df['type'] < 0),]
-            rt_big_sell_amount = rt_big_sell_df['amount'].sum()
-            rt_big_sell_amount_pct = rt_big_sell_amount/rt_amount
-
-            # 买盘的 大单金额
-            rt_big_buy_df = rt_big_df.loc[(rt_big_df['type'] > 0),]
-            rt_big_buy_amount = rt_big_buy_df['amount'].sum()
-            rt_big_buy_amount_pct = rt_big_buy_amount/rt_amount
-
-            rt_baseline = {"date":rt_date_str,"id":id, "big_qty":rt_big_qty, "big_pct":big_amount_pct,
-                           "big_bug_pct":rt_big_buy_amount_pct, "big_sell_pct":rt_big_sell_amount_pct}
-            # DataFrame 组合，大单数量、大单总成交额、大单对冲成交额 slice 总成交量、大单买入金额、大单卖出金额
-            # rt_rule_result_summery = pd.merge(rt_rule_result_summery, rt_id_amount_df, how='left', on=['id'])
-            # rt_rule_result_summery = pd.merge(rt_rule_result_summery, rt_big_sell_amount_df, how='left', on=['id'])
-            # rt_rule_result_summery = pd.merge(rt_rule_result_summery, rt_big_buy_amount_df, how='left', on=['id'])
-            # rt_rule_result_summery.columns = ['id', 'big_counter', 'ave_big_A_per_mint', 'big_A_sum_abs', 'big_A_sum_io']
-            # rt_rule_result_summery.fillna(0, inplace=True)
-
 
 # rt实时对象，src 数据源
 # 利用全局RT 对象完成 数据收集
 # 创建BL 对象完成 基线设定、导入数据库
-def traceback_rt_data(rt=None, src='', date_str = None):
+def rebase_rt_data(rt=None, src='', date_str = None):
     wx = lg.get_handle()
 
     # 股票代码数组，由 rt 对象内部变量 带入
@@ -147,12 +136,19 @@ def traceback_rt_data(rt=None, src='', date_str = None):
         wx.info("[Traceback_RT_Data] 未指定回溯的日期，默认使用 {}".format(date_str))
 
     # 起始时间，作为查询实时交易数据的时间节点
-    # date_str = '20191216'
-    begin_time_arr = ['09:30','10:35','13:05','14:05']#
-    end_time_arr = ['09:35','11:30','14:00','15:00']
-    # end_time_arr = ['10:30','11:30','14:00','15:00']#
+    # begin_time_arr= ['09:30','10:35','13:05','14:05']#
+    # end_time_arr = ['09:35','11:30','14:00','15:00']
+    # end_time_arr  = ['10:30','11:30','14:00','15:00']#
 
-    baseline_big_deal_df = pd.DataFrame()
+    begin_time_arr= ['09:30','10:05','10:35','11:05','13:05','13:35','14:05','14:35']#
+    # end_time_arr  = ['09:40','10:30','11:00','11:30','13:30','14:00','14:30','15:00']#
+    end_time_arr  = ['10:00','10:30','11:00','11:30','13:30','14:00','14:30','15:00']#
+
+    # 保持全部的 baseline 数据，去极值后，一次性导入数据库
+    final_bl_big_deal_df = pd.DataFrame()
+    # 保持全部的 baseline 数据，一次性导入数据库
+    final_bl_pa_df = pd.DataFrame()
+
     bl = rt_bl()
     for index in range(len(begin_time_arr)):
         time_inc = 5
@@ -178,15 +174,33 @@ def traceback_rt_data(rt=None, src='', date_str = None):
                     wx.info("[Traceback_RT_Data][{}/{}] {} [{}--{}]逐笔交易数据[{}-{}]".format(icount+1,len(rt.id_arr),id,time_range[0],time_range[1], date_str, time_str))
                 time.sleep(0.5)
 
-        # 量价 基线数据，每个小时产生一次
-        baseline_PA_df = bl.baseline_PA(rt=rt, date_str=date_str, time_frame_arr=[begin_time_arr[index], end_time_arr[index]])
-        # 导入数据库
-        bl.db_load_baseline_PA(df=baseline_PA_df)
-
-        # 大单交易的 基线数据，每个小时产生一次
+        # 大单交易的 基线数据，每半小时产生一次
         baseline_big_deal_df = bl.baseline_big_deal(rt=rt, date_str=date_str, time_frame_arr=[begin_time_arr[index], end_time_arr[index]])
-        # 导入数据库
-        bl.db_load_baseline_big_deal(df = baseline_big_deal_df)
+        if final_bl_big_deal_df is None or len(final_bl_big_deal_df) == 0:
+            final_bl_big_deal_df = baseline_big_deal_df
+        else:
+            final_bl_big_deal_df = final_bl_big_deal_df.append(baseline_big_deal_df)
 
-        # 释放 RT 对象的内部变量，只保留 最后30分钟的交易数据
-        rt.clr_rt_data(minutes=30)
+        # 量价 基线数据，每半小时产生一次
+        baseline_PA_df = bl.baseline_PA(rt=rt, date_str=date_str, time_frame_arr=[begin_time_arr[index], end_time_arr[index]])
+        if final_bl_pa_df is None or len(final_bl_pa_df) == 0:
+            final_bl_pa_df = baseline_PA_df
+        else:
+            final_bl_pa_df = final_bl_pa_df.append(baseline_PA_df)
+
+        # 释放 RT 对象的内部变量，只保留 最后15分钟的交易数据
+        rt.clr_rt_data(minutes=15)
+    # for循环结束，进入下一个时间段（半小时）
+
+    # 全天交易时间结束，将基线数据导入数据库
+    # 导入数据库
+    bl.db_load_baseline_big_deal(df=final_bl_big_deal_df)
+
+    # 再次对全天的 PA 数据去极值
+    final_bl_pa_df = bl._clr_extreme_data(pa_df=final_bl_pa_df)
+    bl.db_load_baseline_PA(df=final_bl_pa_df)
+
+
+
+
+
