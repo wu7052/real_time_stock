@@ -45,7 +45,7 @@ class rt_bl:
         else:
             wx.info("[RT_BL][baseline_PA] 量价基线设立日期：{}".format(date_str))
 
-        # 半个小时 时间段，来自 traceback_rt_data 设定
+        # 半个小时 时间段，来自 rebase_rt_data 设定
         t_frame_begin_stamp = int(time.mktime(time.strptime(date_str + time_frame_arr[0], "%Y%m%d%H:%M")))
         t_frame_end_stamp = int(time.mktime(time.strptime(date_str + time_frame_arr[1], "%Y%m%d%H:%M")))
 
@@ -409,9 +409,13 @@ class rt_bl:
         self.std_PVA_dict = std_PVA_df.to_dict(orient= 'index')
         wx.info("[RT_BL][get_std_PV] [{}支股票]的基线数据设立完毕".format(len(id_arr)))
 
-    def get_baseline_big_deal(self):
+    def get_baseline_pa(self, days=1):
+        bl_pa = self.db.get_bl_pa(days = days)
+        baseline_pa = pd.DataFrame()
+
+    def get_baseline_big_deal(self, days=3):
         wx = lg.get_handle()
-        bl_df = self.db.get_bl_big_deal(days=3)
+        bl_df = self.db.get_bl_big_deal(days=days)
         baseline_bd_df = pd.DataFrame()
         for tmp_df in bl_df.groupby(bl_df['id']):
             # for each_id_tframe_df in each_id_df[1].groupby(by=['t_frame']):
@@ -491,4 +495,6 @@ class rt_bl:
                 baseline_bd_df = id_df
             else:
                 baseline_bd_df = baseline_bd_df.append(id_df)
+
+        baseline_bd_df.reset_index(drop=False, inplace=True)
         return baseline_bd_df

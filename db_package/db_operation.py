@@ -100,6 +100,26 @@ class db_ops:
         self.cursor.executemany(sql, df_array)
         self.handle.commit()
 
+
+    # 实时交易数据 监测的超阀值记录 导入数据库
+    def db_load_RT_MSG(self, df = None):
+        wx = lg.get_handle()
+        t_name = self.h_conf.rd_opt('db', 'rt_message')
+
+        if df is None or df.empty:
+            wx.info("[db_load_RT_MSG] 实时信息 DataFrame 为空，退出")
+            return
+        df_array = df.values.tolist()
+        i = 0
+        while i < len(df_array):
+            df_array[i] = tuple(df_array[i])
+            i += 1
+
+        sql = "REPALCE INTO "+ t_name +" SET id=%s, date=%s, t_frame=%s, type=%s, msg=%s"
+        self.cursor.executemany(sql, df_array)
+        self.handle.commit()
+
+
     def db_load_into_RT_BL_PA(self, df = None):
         wx = lg.get_handle()
         t_name = self.h_conf.rd_opt('db', 'rt_baseline_PA')
@@ -130,6 +150,16 @@ class db_ops:
                                     "down_bl_pct_ave=%s, down_bl_amount_ave=%s"
         self.cursor.executemany(sql, df_array)
         self.handle.commit()
+
+    def get_bl_pa(self, days=1):
+        t_name = self.h_conf.rd_opt('db', 'rt_baseline_PA')
+        sql = "select distinct date from "+t_name+"  order by date desc limit "+str(days)
+        date_df = self._exec_sql(sql = sql)
+        data_arr = date_df.date.values.tolist()
+        date_str = ",".join(data_arr)
+        sql = "select * from "+t_name+" where date in ("+date_str+")"
+        ret_df = self._exec_sql(sql=sql)
+        return ret_df
 
     def get_bl_big_deal(self, days=3):
         wx = lg.get_handle()

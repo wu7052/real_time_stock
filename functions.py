@@ -56,14 +56,18 @@ def get_rt_data(rt=None, src='', date_str=''):
 
     time_inc = 5  # 5分钟增量
 
-    # 从记录文件读取最近一次获取实时交易的时间
+    # 从记录文件读取上一次查询实时交易的截止时间，本次查询的开始时间
+    # 获得的时间戳有两种情况 1）取整（半小时）的时间戳 2）空文件，自动处理成 09:25
     # 记录文件名：日期_数据来源
     begin_time_str = rt._get_last_record_()
     if begin_time_str is None :
         begin_time_str = '09:25'
+    elif begin_time_str == '15:00':
+        wx.info("[Get_RT_Data] 今日文件记录已查询过所有实时交易，退出")
+        return None
 
     # 开始 获取实时交易的时间起点，并判断时间是否在交易时间
-    begin_time_stamp = int(time.mktime(time.strptime(date_str+begin_time_str, "%Y%m%d%H:%M"))) + time_inc*60
+    begin_time_stamp = int(time.mktime(time.strptime(date_str+begin_time_str[:5], "%Y%m%d%H:%M")))
     ret_zone = my_timer.tell_time_zone(t_stamp = begin_time_stamp)
     if ret_zone[0] < 0:
         begin_time_stamp = ret_zone[1]
@@ -74,9 +78,9 @@ def get_rt_data(rt=None, src='', date_str=''):
     if ret_zone[0] < 0:
         end_time_stamp = ret_zone[1]
 
-    if begin_time_stamp > end_time_stamp:
-        wx.info("[Get_RT_Data] 查询间隔不足5分钟，需等待{}秒".format(begin_time_stamp-end_time_stamp))
-        time.sleep(begin_time_stamp-end_time_stamp)
+    # if begin_time_stamp > end_time_stamp:
+    #     wx.info("[Get_RT_Data] 查询间隔不足5分钟，需等待{}秒".format(begin_time_stamp-end_time_stamp))
+    #     time.sleep(begin_time_stamp-end_time_stamp)
 
     while begin_time_stamp <= end_time_stamp:
         time_str = time.strftime("%H:%M:%S", time.localtime(begin_time_stamp))
@@ -95,10 +99,15 @@ def get_rt_data(rt=None, src='', date_str=''):
                 wx.info("[Get_RT_Data][{}/{}] {} [{}--{}]逐笔交易数据[{}]".format(icount + 1, len(rt.id_arr), id, time_range[0],
                                                                             time_range[1], time_str))
 
+        # 计算下一个循环的 起始时间， 和 文件记录时间，并调整
         begin_time_stamp += time_inc*60
         ret_zone = my_timer.tell_time_zone(t_stamp=begin_time_stamp)
         if ret_zone[0] == -3:
             begin_time_stamp = ret_zone[1]
+        elif ret_zone[0] > 0: # 在交易时间内，文件记录时间取整
+            record_stamp = ret_zone[2]
+        elif ret_zone[0] == -5:
+            record_stamp = ret_zone[2]
 
         # begin_time_stamp == end_time_stamp 再进行一次循环
         # begin_time_stamp > end_time_stamp 且差值 在 time_inc * 60 秒内，设置 begin == end
@@ -106,8 +115,10 @@ def get_rt_data(rt=None, src='', date_str=''):
             begin_time_stamp = end_time_stamp
 
     # 文件记录最近一次的实时交易数据时间
-    rt.f_record.write('\n'+time_str[:5])
-
+    time_str = time.strftime("%H:%M", time.localtime(record_stamp))
+    rt.f_record.write('\n'+time_str)
+    rt.f_record.flush()
+    return True
     # 获得当前时间，作为查询实时交易数据的时间节点
     # time_str = time.strftime("%H:%M:%S", time.localtime())
     # time_str = (datetime.datetime.now()).strftime("%H:%M:%S")
@@ -115,9 +126,10 @@ def get_rt_data(rt=None, src='', date_str=''):
     # time_str = (datetime.now()+timedelta(hours=-11)).strftime("%H:%M:%S")
 
 
-def ana_rt_data(ana=None, rt=None):
-    ana.rt_analyzer(rt = rt)
-
+def ana_rt_data(rt=None, big_bl_df = None, pa_bl_df =None):
+    analyzer = rt_ana()
+    big_cmp_result = analyzer.rt_cmp_big_baseline(rt = rt, big_bl_df=big_bl_df)
+    analyzer.db_load_into_rt_msg(cmp_df = big_cmp_result)
 
 # rt实时对象，src 数据源
 # 利用全局RT 对象完成 数据收集
@@ -136,9 +148,6 @@ def rebase_rt_data(rt=None, src='', date_str = None):
         wx.info("[Traceback_RT_Data] 未指定回溯的日期，默认使用 {}".format(date_str))
 
     # 起始时间，作为查询实时交易数据的时间节点
-    # begin_time_arr= ['09:30','10:35','13:05','14:05']#
-    # end_time_arr = ['09:35','11:30','14:00','15:00']
-    # end_time_arr  = ['10:30','11:30','14:00','15:00']#
 
     begin_time_arr= ['09:30','10:05','10:35','11:05','13:05','13:35','14:05','14:35']#
     # end_time_arr  = ['09:40','10:30','11:00','11:30','13:30','14:00','14:30','15:00']#

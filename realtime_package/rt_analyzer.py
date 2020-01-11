@@ -1,11 +1,13 @@
 from db_package import db_ops
 import new_logger as lg
-from datetime import datetime, time, date, timedelta
+from datetime import datetime, date, timedelta
+import time
 import os
 import sys
 from conf import conf_handler
 import pandas as pd
 from msg_package import f_msg
+
 
 class rt_ana:
     def __init__(self):
@@ -15,8 +17,216 @@ class rt_ana:
         self.rt_big_amount = float(h_conf.rd_opt('rt_analysis_rules','big_deal_amount'))
         self.msg = f_msg()
 
+        # 建立数据库对象
+        self.db = db_ops()
+
         self.rt_data_keeper_1 = pd.DataFrame() # 保存 大单记录，作为基线数据
 
+        # key:array  时间段开始时间：[时间段结束时间， 下一时间段开始时间]
+        self.t_frame_dict = {'09:30':['10:00','10:05'],'10:05':['10:30','10:35'],'10:35':['11:00','11:05'],
+                             '11:05':['11:30','13:05'],'13:05':['13:30','13:35'],'13:35':['14:00','14:05'],
+                             '14:05':['14:30','14:35'],'14:35':['15:00','']}
+
+    def rt_cmp_big_baseline(self, rt=None, big_bl_df=None):
+        wx = lg.get_handle()
+        rt_dict_df = rt.rt_dict_df
+        date_str = (date.today()).strftime('%Y%m%d')
+        if rt_dict_df is None:
+            wx.info("[Rt_Ana][Rt_Cmp_Baseline] 实时数据字典 是空，退出")
+            return None
+        if big_bl_df is None:
+            wx.info("[Rt_Ana][Rt_Cmp_Baseline] 基线数据 是空，退出")
+            return None
+
+        rt_big_deal_df = pd.DataFrame()
+        for id in rt_dict_df.keys():
+            if rt_dict_df[id] is None:
+                wx.info("[Rt_Ana][Rt_Cmp_Baseline] {} 未产生实时交易数据，进入下一支股票".format(id))
+                continue
+
+            # 起始时间边界对齐
+            [frame_begin_stamp, frame_begin_time_str] = self.rt_df_find_start_stamp(rt_stamp= rt_dict_df[id]['time_stamp'].min())
+            end_stamp = rt_dict_df[id].time_stamp.max()
+
+            # 按时间段 切片rt数据，计算每个片段的 大单数据，并与基线做比对，再导入基线数据库
+            while frame_begin_stamp < end_stamp:
+                # frame_begin_time_str = time.strftime("%H:%M", time.localtime(frame_begin_stamp))
+                frame_end_time_str = self.t_frame_dict.get(frame_begin_time_str)[0]
+                if frame_end_time_str is None:
+                    wx.info("[Rt_Ana][Rt_Cmp_Baseline] {} [{}] 起始时间不属于正常范围！！！！".format(id, frame_begin_time_str))
+                    break
+                else:
+                    t_frame = frame_begin_time_str + "-" + frame_end_time_str
+                    frame_end_stamp = int(time.mktime(time.strptime(date_str + frame_end_time_str, '%Y%m%d%H:%M')))
+
+                if frame_end_stamp > end_stamp:
+                    wx.info("[Rt_Ana][Rt_Cmp_Baseline] {} {} 已超出本次获取的实时数据范围，进入下一支股票".format(id, t_frame))
+                    break
+
+                if frame_end_time_str == '15:00':  # 15:00 收市后，有最后一笔交易记录 产生在 15:00 之后若干秒
+                    rt_df = rt.rt_dict_df[id].loc[(rt.rt_dict_df[id]['time_stamp'] >= frame_begin_stamp)].copy()
+                else:
+                    rt_df = rt.rt_dict_df[id].loc[(rt.rt_dict_df[id]['time_stamp'] >= frame_begin_stamp) &
+                                                  (rt.rt_dict_df[id]['time_stamp'] <= frame_end_stamp)].copy()
+
+                if rt_df is None or rt_df.empty:
+                    wx.info("[Rt_Ana][Rt_Cmp_Baseline] [{}] 在[{}]期间交易数据为空，开始处理下一支股票".format(id, t_frame))
+                    break
+
+                # ID 的所有成交量
+                rt_df['amount'] = rt_df['vol'] * rt_df['price']
+                rt_amount = rt_df['amount'].sum()
+                rt_df['io_amount'] = rt_df['amount'] * rt_df['type']
+
+                # 内外盘、中性盘的数量统计、金额统计
+                rt_sell_qty = rt_df.loc[rt_df["type"] == -1].shape[0]
+                rt_buy_qty = rt_df.loc[rt_df["type"] == 1].shape[0]
+                rt_air_qty = rt_df.loc[rt_df["type"] == 0].shape[0]
+                rt_buy_amount = rt_df.loc[rt_df["type"] == 1].amount.sum()
+                rt_sell_amount = rt_df.loc[rt_df["type"] == -1].amount.sum()
+                rt_air_amount = rt_df.loc[rt_df["type"] == 0].amount.sum()
+
+                # 成交明细中的 大单列表
+                rt_big_df = rt_df.loc[rt_df['amount'] >= self.rt_big_amount,]
+                # 大单的数量
+                rt_big_qty = len(rt_big_df)
+                # 大单买入、卖出金额合计
+                rt_big_amount_sum_abs = rt_big_df['amount'].sum()
+                # 大单买入 卖出对冲后的金额
+                rt_big_amount_sum_io = rt_big_df['io_amount'].sum()
+
+                # 大单金额 占 总成交量的比例
+                big_abs_amount_pct = rt_big_amount_sum_abs/rt_amount
+
+                # 大单净买入 占 总成交量的比例
+                big_io_amount_pct = rt_big_amount_sum_io / rt_amount
+
+                # 平均每分钟的 大单买入、卖出金额
+                # rt_ave_big_amount_per_min_abs = rt_big_amount_sum_abs/((rt_end_time-rt_begin_time)/60)
+
+                # 卖盘的 大单金额
+                rt_big_sell_df = rt_big_df.loc[(rt_big_df['type'] < 0),]
+                rt_big_sell_amount = rt_big_sell_df['amount'].sum()
+                rt_big_sell_amount_pct = rt_big_sell_amount/rt_amount
+
+                # 买盘的 大单金额
+                rt_big_buy_df = rt_big_df.loc[(rt_big_df['type'] > 0),]
+                rt_big_buy_amount = rt_big_buy_df['amount'].sum()
+                rt_big_buy_amount_pct = rt_big_buy_amount/rt_amount
+
+                rt_data = {"id":id, "date":date_str,"t_frame":t_frame, "big_qty":rt_big_qty,
+                               "big_abs_pct":big_abs_amount_pct, "big_io_pct":big_io_amount_pct,
+                               "big_buy_pct":rt_big_buy_amount_pct, "big_sell_pct":rt_big_sell_amount_pct,
+                               "amount":rt_amount, "sell_qty":rt_sell_qty, "sell_amount":rt_sell_amount,
+                               "buy_qty":rt_buy_qty, "buy_amount":rt_buy_amount,
+                               "air_qty":rt_air_qty, "air_amount":rt_air_amount}
+
+                if rt_big_deal_df is None or rt_big_deal_df.empty:
+                    rt_big_deal_df = pd.DataFrame([rt_data])
+                else:
+                    rt_big_deal_df = rt_big_deal_df.append(pd.DataFrame([rt_data]))
+
+                # 准备进入下一个循环
+                frame_begin_time_str = self.t_frame_dict.get(frame_begin_time_str)[1]
+                if len(frame_begin_time_str) == 0:
+                    wx.info("[Rt_Ana][Rt_Cmp_Baseline] {} {} 已处理完毕，进入下一支股票".format(id, t_frame))
+                    break
+                frame_begin_stamp = int(time.mktime(time.strptime(date_str + frame_begin_time_str, '%Y%m%d%H:%M')))
+
+        if rt_big_deal_df is None or rt_big_deal_df.empty:
+            wx.info("[Rt_Ana][Rt_Cmp_Baseline] 大单数据为空，退出")
+            return None
+        else:
+            cols = ['id','date','t_frame','big_qty','big_abs_pct','big_io_pct','big_buy_pct','big_sell_pct',
+                    'amount','sell_qty','sell_amount','buy_qty','buy_amount','air_qty','air_amount']
+            rt_big_deal_df = rt_big_deal_df.loc[:,cols]
+            rt_big_deal_df.fillna(0,inplace=True)
+            rt_big_deal_df.reset_index(drop=True, inplace=True)
+
+        # 导入基线数据库
+        # self.db.db_load_into_RT_BL_Big_Deal(df=rt_big_deal_df)
+
+        big_cmp_df = pd.merge(rt_big_deal_df, big_bl_df, on=['id','t_frame'], how='left')
+
+        cmp_dict = {'big_qty':['b_qty_max', 'b_qty_min','大单数量-[超高]-','大单数量-[超低]-','big_deal'],  # 大单数量
+                    'big_abs_pct':['b_pct_max', 'b_pct_min','大单金额占比-[超高]-','大单金额占比-[超低]-','big_deal'], # 大单金额占比
+                    'big_buy_pct':['b_buy_pct_max', 'b_buy_pct_min','大买单金额占比-[超高]-','大买单金额占比-[超低]-','big_deal'],  # 大单买入金额占比
+                    'big_sell_pct':['b_sell_pct_max', 'b_sell_pct_min','大卖单金额占比-[超高]-','大卖单金额占比-[超低]-','big_deal'], # 大单卖出金额占比
+                    'buy_qty':['all_buy_qty_max', 'all_buy_qty_min','外盘数量-[超高]-','外盘数量-[超低]-','buy_sell'], # 买盘（外盘）单数
+                    'buy_amount':['all_buy_amount_max', 'all_buy_amount_min','外盘金额-[超高]-','外盘金额-[超低]-','buy_sell'], # 买盘（外盘） 金额
+                    'sell_qty': ['all_sell_qty_max', 'all_sell_qty_min','内盘数量-[超高]-','内盘数量-[超低]-', 'buy_sell'], # 卖盘（内盘）单数
+                    'sell_amount':['all_sell_amount_max', 'all_sell_amount_min','内盘金额-[超高]-','内盘金额-[超低]-', 'buy_sell']} # 卖盘（内盘）金额
+        cmp_result_df = pd.DataFrame()
+        for key in cmp_dict.keys():
+            high_df = big_cmp_df.loc[big_cmp_df[key] > big_cmp_df[cmp_dict[key][0]]]
+            high_df = self._cmp_data_process_(df = high_df, key = key, val = cmp_dict[key][0], msg = cmp_dict[key][2], type = cmp_dict[key][4])
+            low_df = big_cmp_df.loc[big_cmp_df[key] < big_cmp_df[cmp_dict[key][1]]]
+            low_df = self._cmp_data_process_(df = low_df, key = key, val = cmp_dict[key][1], msg = cmp_dict[key][3], type = cmp_dict[key][4])
+            if cmp_result_df is None or len(cmp_result_df) == 0:
+                if high_df is not None:
+                    cmp_result_df = high_df
+                    if low_df is not None:
+                        cmp_result_df = cmp_result_df.append(low_df)
+                else:
+                    cmp_result_df = low_df
+            else:
+                if high_df is not None:
+                    cmp_result_df = cmp_result_df.append(high_df)
+                if low_df is not None:
+                    cmp_result_df = cmp_result_df.append(low_df)
+        return cmp_result_df
+
+    def _cmp_data_process_(self, df=None, type='', key='', val='', msg=''):
+        wx = lg.get_handle()
+        if df is None:
+            return None
+        ret_df = pd.DataFrame(df, columns=['id','date','t_frame',key, val ])
+        # ret_df[[key, val]] = ret_df[[key, val]].astype(int)
+        # ret_df[key] = round(ret_df[key],2)
+        # ret_df[val] = round(ret_df[val],2)
+        ret_df = ret_df.round({key: 2, val: 2})
+        ret_df[[key, val]] = ret_df[[key, val]].astype(str)
+        ret_df['msg'] = msg +"[当前]:" +ret_df[key]+" -- [最值]:"+ ret_df[val]
+        ret_df['type'] = type
+        ret_df.drop(columns=[key, val], inplace=True)
+        return ret_df
+
+    def rt_df_find_start_stamp(self, rt_stamp=None):
+        wx = lg.get_handle()
+        if rt_stamp is None:
+            wx.info("[Rt_Ana][Rt_DF_Segment] 初始时间戳为空，退出")
+            return None
+
+        date_str = (date.today()).strftime('%Y%m%d')
+
+        # ['09:30', '10:05', '10:35', '11:05', '13:05', '13:35', '14:05', '14:35']  #
+        record_stamp_dict = {int(time.mktime(time.strptime(date_str + " 14:30:00", '%Y%m%d %H:%M:%S'))):"14:35",
+                            int(time.mktime(time.strptime(date_str + " 14:00:00", '%Y%m%d %H:%M:%S'))):"14:05",
+                            int(time.mktime(time.strptime(date_str + " 13:30:00", '%Y%m%d %H:%M:%S'))):"13:35",
+                            int(time.mktime(time.strptime(date_str + " 13:00:00", '%Y%m%d %H:%M:%S'))):"13:05",
+                            int(time.mktime(time.strptime(date_str + " 11:00:00", '%Y%m%d %H:%M:%S'))):"11:05",
+                            int(time.mktime(time.strptime(date_str + " 10:30:00", '%Y%m%d %H:%M:%S'))):"10:35",
+                            int(time.mktime(time.strptime(date_str + " 10:00:00", '%Y%m%d %H:%M:%S'))):"10:05",
+                            int(time.mktime(time.strptime(date_str + " 09:25:00", '%Y%m%d %H:%M:%S'))):"09:30"}
+        record_stamp_arr = list(record_stamp_dict.keys())
+        record_stamp_arr.sort(reverse=True)
+        for stamp in record_stamp_arr:
+            if stamp > rt_stamp:
+                continue
+            else:
+                return [stamp, record_stamp_dict[stamp]]
+        return None
+
+    def db_load_into_rt_msg(self, cmp_df = None):
+        wx = lg.get_handle()
+        if cmp_df is None:
+            wx.info("[Rt_Ana][DB_load_into_rt_msg] 初始时间戳为空，退出")
+            return None
+        self.db.db_load_RT_MSG(df = cmp_df)
+        wx.info("[Rt_Ana][DB_load_into_rt_msg] 已导入 {} 条超阀值的交易记录".format(len(cmp_df)))
+
+    """
+    # 废弃函数
     def rt_analyzer(self, rt = None):
         wx = lg.get_handle()
         rt_dict_df = rt.rt_dict_df
@@ -63,6 +273,8 @@ class rt_ana:
         #         format(t_slice, sliced_rt_df.time_str.min(), sliced_rt_df.time_str.max(), len(sliced_ana_ret_df)))
 
 
+
+    # 废弃函数
     # 【大单分析】时间切片 筛选出 big_amount 的大单，再统计金额、笔数、买入卖出
     # vol单位：1股
     # 与rt_data_keeper 保存的数据做比对
@@ -118,6 +330,7 @@ class rt_ana:
         return rt_rule_result_summery
 
 
+    # 废弃函数
     # 时间切片 计算平均每分钟的成交量 ，与基线数据对比
     # vol单位：1股
     def rt_rule_2(self, rt=None, rt_df=None, t_slice = 0):
@@ -147,13 +360,7 @@ class rt_ana:
 
         return rt_rule_result_summery
 
-    # 大单数据对比分析
-    def rt_cmp_1(self, his_df=None, new_df = None):
-        wx = lg.get_handle()
-        wx.info("[rt_ana][rt_cmp_1]")
-
-        pass
-
+    # 废弃函数
     # 对实时交易Dataframe 按照 conf 文件中的 ana_time_slice 切片
     def rt_df_slice(self, rt_df = None, t_slice=0):
         wx = lg.get_handle()
@@ -168,6 +375,7 @@ class rt_ana:
         sliced_rt_df = rt_df.loc[rt_df['time_stamp'] >= start_t_stamp]
         return sliced_rt_df
 
+    # 废弃函数
     def output_table(self, dd_df=None, filename='null', sheet_name=None, type='.xlsx', index=False):
         wx = lg.get_handle()
         work_path = os.path.dirname(os.path.abspath(sys.argv[0]))
@@ -183,4 +391,4 @@ class rt_ana:
                 dd_df.to_excel(filename,index=index, sheet_name= sheet_name, float_format="%.2f", encoding='utf_8_sig')
             else:
                 dd_df.to_csv(filename, index=index, encoding='utf_8_sig')
-
+    """

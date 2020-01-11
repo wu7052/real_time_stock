@@ -6,7 +6,7 @@ import new_logger as lg
 lg._init_()
 wx = lg.get_handle()
 from stock_package import ts_data
-from realtime_package import rt_163, rt_bl
+from realtime_package import rt_163, rt_bl, rt_ana
 
 # import pandas as pd
 # from assess_package import back_trader
@@ -23,17 +23,24 @@ xl_h = xl_handler(f_name="accounts.xlsx")
 xl_h.rd_file()
 id_arr = xl_h.get_stock_id_from_conf()
 
-
+# 实时交易对象
 rt163 = rt_163(id_arr=id_arr, date_str='')
 
-# get_rt_data(rt=rt163, src='163', date_str='')
+# 基线数据对象
+bl = rt_bl()
+# 从数据库中统计 过去三天 大单交易、内外盘的基线值
+# 涵盖所有监控的股票
+big_bl_df = bl.get_baseline_big_deal(days=3)
 
-# bl = rt_bl()
-# bl.get_baseline_big_deal()
+# 开始获得 实时交易数据，并保存到 RT 实时交易对象中
+# 从记录文件中读取 开始时间，当前时间作为截止时间
+if get_rt_data(rt=rt163, src='163', date_str='20200110'):
+    ana_rt_data(rt=rt163, big_bl_df=big_bl_df, pa_bl_df=None)
+
 # rt实时对象，src 数据源
 # 利用全局RT 对象完成 数据收集
 # 创建BL 对象完成 基线设定、导入数据库
-rebase_rt_data(rt=rt163, src='163', date_str = '')
+# rebase_rt_data(rt=rt163, src='163', date_str = '')
 
 
 # rt163.clr_rt_data(minutes=0)

@@ -15,9 +15,20 @@ class wx_timer():
 
         self.m_s_time = int(time.mktime(time.strptime(date_str + " 09:30:00", '%Y%m%d %H:%M:%S')))
         self.m_e_time = int(time.mktime(time.strptime(date_str + " 11:30:00", '%Y%m%d %H:%M:%S')))
-        self.n_s_time = int(time.mktime(time.strptime(date_str + " 13:00:00", '%Y%m%d %H:%M:%S')))
+        self.n_s_time = int(time.mktime(time.strptime(date_str + " 13:05:00", '%Y%m%d %H:%M:%S')))
         self.n_e_time = int(time.mktime(time.strptime(date_str + " 15:00:00", '%Y%m%d %H:%M:%S')))
 
+        # get_rt_data 函数中 ，记录上一次查询RT数据的截止时间戳，即下一次查询的开始时间戳，以半小时为界限取整
+        # ['09:30', '10:05', '10:35', '11:05', '13:05', '13:35', '14:05', '14:35']  #
+        self.record_stamp_arr = [int(time.mktime(time.strptime(date_str + " 14:35:00", '%Y%m%d %H:%M:%S'))),
+                                 int(time.mktime(time.strptime(date_str + " 14:05:00", '%Y%m%d %H:%M:%S'))),
+                                 int(time.mktime(time.strptime(date_str + " 13:35:00", '%Y%m%d %H:%M:%S'))),
+                                 int(time.mktime(time.strptime(date_str + " 13:05:00", '%Y%m%d %H:%M:%S'))),
+                                 int(time.mktime(time.strptime(date_str + " 11:05:00", '%Y%m%d %H:%M:%S'))),
+                                 int(time.mktime(time.strptime(date_str + " 10:35:00", '%Y%m%d %H:%M:%S'))),
+                                 int(time.mktime(time.strptime(date_str + " 10:05:00", '%Y%m%d %H:%M:%S'))),
+                                 int(time.mktime(time.strptime(date_str + " 09:30:00", '%Y%m%d %H:%M:%S')))]
+        # self.record_stamp_arr.sort(reverse = True)
         # self.m_s_time = datetime.datetime.strptime(date_str + " 09:30:00", '%Y-%m-%d %H:%M:%S')
         # self.m_e_time = datetime.datetime.strptime(date_str + " 11:30:00", '%Y-%m-%d %H:%M:%S')
         # self.n_s_time = datetime.datetime.strptime(date_str + " 13:00:00", '%Y-%m-%d %H:%M:%S')
@@ -54,13 +65,28 @@ class wx_timer():
         if t_stamp ==0 :
             return [0,0]
 
-        if t_stamp < self.m_s_time:
+        self.record_stamp_arr.sort(reverse=True)  #降序排列
+
+        if t_stamp < self.m_s_time:  # 早上9:30之前
             return [-1, self.m_s_time]
-        elif t_stamp >= self.m_s_time and t_stamp <= self.m_e_time:
-            return [2,t_stamp]
+        elif t_stamp >= self.m_s_time and t_stamp <= self.m_e_time:  # 上午交易时间
+            for i in self.record_stamp_arr:
+                if i > t_stamp:
+                    continue
+                else:
+                    record_stamp = i
+                    break # 找到第一个小于 当前时间戳的 整数时间
+            return [2,t_stamp, record_stamp]
         elif t_stamp > self.m_e_time and t_stamp < self.n_s_time:
             return [-3, self.n_s_time]
-        elif t_stamp >= self.n_s_time and t_stamp <= self.n_e_time:
-            return [4, t_stamp]
-        elif t_stamp > self.n_e_time:
-            return [-5, self.n_e_time]
+        elif t_stamp >= self.n_s_time and t_stamp <= self.n_e_time:  # 下午交易时间
+            for i in self.record_stamp_arr:
+                if i > t_stamp:
+                    continue
+                else:
+                    record_stamp = i
+                    break # 找到第一个小于 当前时间戳的 整数时间
+            return [4, t_stamp, record_stamp]
+        elif t_stamp > self.n_e_time:  # 下午 15:00 以后
+            date_str = (date.today()).strftime('%Y%m%d')
+            return [-5, self.n_e_time, int(time.mktime(time.strptime(date_str + " 15:00:00", '%Y%m%d %H:%M:%S')))]
