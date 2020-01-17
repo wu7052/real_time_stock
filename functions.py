@@ -128,8 +128,10 @@ def get_rt_data(rt=None, src='', date_str=''):
 
 def ana_rt_data(rt=None, big_bl_df = None, pa_bl_df =None):
     analyzer = rt_ana()
-    big_cmp_result = analyzer.rt_cmp_big_baseline(rt = rt, big_bl_df=big_bl_df)
-    analyzer.db_load_into_rt_msg(cmp_df = big_cmp_result)
+    # big_cmp_result = analyzer.rt_cmp_big_baseline(rt = rt, big_bl_df=big_bl_df)
+    # analyzer.db_load_into_rt_msg(cmp_df = big_cmp_result)
+
+    pa_cmp_result = analyzer.rt_cmp_pa_baseline(rt = rt, pa_bl_df = pa_bl_df)
 
 # rt实时对象，src 数据源
 # 利用全局RT 对象完成 数据收集
@@ -139,18 +141,19 @@ def rebase_rt_data(rt=None, src='', date_str = None):
 
     # 股票代码数组，由 rt 对象内部变量 带入
     if rt.id_arr is None:
-        wx.info("[Traceback_RT_Data] 股票列表为空，退出")
+        wx.info("[Rebase_RT_Data] 股票列表为空，退出")
         return None
 
     # 股票代码数组，由 rt 对象内部变量 带入
     if date_str is None or len(date_str) == 0:
         date_str = (datetime.today()).strftime('%Y%m%d')
-        wx.info("[Traceback_RT_Data] 未指定回溯的日期，默认使用 {}".format(date_str))
+        wx.info("[Rebase_RT_Data] 未指定回溯的日期，默认使用 {}".format(date_str))
 
     # 起始时间，作为查询实时交易数据的时间节点
 
     begin_time_arr= ['09:30','10:05','10:35','11:05','13:05','13:35','14:05','14:35']#
-    # end_time_arr  = ['09:40','10:30','11:00','11:30','13:30','14:00','14:30','15:00']#
+    # begin_time_arr= ['13:05','13:35','14:05','14:35']#
+    # end_time_arr  = ['13:30','14:00','14:30','15:00']#
     end_time_arr  = ['10:00','10:30','11:00','11:30','13:30','14:00','14:30','15:00']#
 
     # 保持全部的 baseline 数据，去极值后，一次性导入数据库
@@ -170,7 +173,7 @@ def rebase_rt_data(rt=None, src='', date_str = None):
 
             # rt 对象在主函数生成，传入此函数，添加
             if src == '163':
-                wx.info("[Traceback_RT_Data] 从[{}] 获得[{}] 支股票的交易数据 [{}]-[{}] ".format(src, len(rt.id_arr), date_str, time_str ))
+                wx.info("[Rebase_RT_Data] 从[{}] 获得[{}] 支股票的交易数据 [{}]-[{}] ".format(src, len(rt.id_arr), date_str, time_str ))
 
             for icount, id in enumerate(rt.id_arr):
                 # wx.info("[Get_RT_Data][{}:{}] {} 获取逐笔交易数据[{}]".format(icount+1,len(rt.id_arr),id, time_str))
@@ -178,20 +181,20 @@ def rebase_rt_data(rt=None, src='', date_str = None):
                 # wx.info("[Get_RT_Data][{}:{}] {} 解析逐笔交易数据[{}]".format(icount+1,len(rt.id_arr),id, time_str))
                 time_range = rt.json_parse(id=id, json_str=json_str)
                 if time_range is None:
-                    wx.info("[Traceback_RT_Data][{}/{}] [{}] [{}-{}] 交易数据不存在".format(icount+1,len(rt.id_arr),id, date_str, time_str))
+                    wx.info("[Rebase_RT_Data][{}/{}] [{}] [{}-{}] 交易数据不存在".format(icount+1,len(rt.id_arr),id, date_str, time_str))
                 else:
-                    wx.info("[Traceback_RT_Data][{}/{}] {} [{}--{}]逐笔交易数据[{}-{}]".format(icount+1,len(rt.id_arr),id,time_range[0],time_range[1], date_str, time_str))
+                    wx.info("[Rebase_RT_Data][{}/{}] {} [{}--{}]逐笔交易数据[{}-{}]".format(icount+1,len(rt.id_arr),id,time_range[0],time_range[1], date_str, time_str))
                 time.sleep(0.5)
 
         # 大单交易的 基线数据，每半小时产生一次
-        baseline_big_deal_df = bl.baseline_big_deal(rt=rt, date_str=date_str, time_frame_arr=[begin_time_arr[index], end_time_arr[index]])
+        baseline_big_deal_df = bl.set_baseline_big_deal(rt=rt, date_str=date_str, time_frame_arr=[begin_time_arr[index], end_time_arr[index]])
         if final_bl_big_deal_df is None or len(final_bl_big_deal_df) == 0:
             final_bl_big_deal_df = baseline_big_deal_df
         else:
             final_bl_big_deal_df = final_bl_big_deal_df.append(baseline_big_deal_df)
 
         # 量价 基线数据，每半小时产生一次
-        baseline_PA_df = bl.baseline_PA(rt=rt, date_str=date_str, time_frame_arr=[begin_time_arr[index], end_time_arr[index]])
+        baseline_PA_df = bl.set_baseline_PA(rt=rt, date_str=date_str, time_frame_arr=[begin_time_arr[index], end_time_arr[index]])
         if final_bl_pa_df is None or len(final_bl_pa_df) == 0:
             final_bl_pa_df = baseline_PA_df
         else:
@@ -206,7 +209,7 @@ def rebase_rt_data(rt=None, src='', date_str = None):
     bl.db_load_baseline_big_deal(df=final_bl_big_deal_df)
 
     # 再次对全天的 PA 数据去极值
-    final_bl_pa_df = bl._clr_extreme_data(pa_df=final_bl_pa_df)
+    # final_bl_pa_df = bl._clr_extreme_data(pa_df=final_bl_pa_df)
     bl.db_load_baseline_PA(df=final_bl_pa_df)
 
 

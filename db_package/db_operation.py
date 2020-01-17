@@ -115,7 +115,7 @@ class db_ops:
             df_array[i] = tuple(df_array[i])
             i += 1
 
-        sql = "REPALCE INTO "+ t_name +" SET id=%s, date=%s, t_frame=%s, type=%s, msg=%s"
+        sql = "REPLACE INTO "+ t_name +" SET id=%s, date=%s, t_frame=%s, type=%s, msg=%s"
         self.cursor.executemany(sql, df_array)
         self.handle.commit()
 

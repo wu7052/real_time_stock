@@ -37,7 +37,7 @@ class rt_bl:
     # 量价基线内容：采样频率 20S 一次，计算量价向量长度，统计均值 和 标准差
     # time_frame_arr ['09:30','10:30'] 起止时间段
 
-    def baseline_PA(self, rt=None, date_str=None, time_frame_arr=None):
+    def set_baseline_PA(self, rt=None, date_str=None, time_frame_arr=None):
         wx = lg.get_handle()
         if date_str is None or len(date_str) == 0:
             date_str = datetime.now().strftime("%Y%m%d")
@@ -73,7 +73,7 @@ class rt_bl:
                 rt.rt_dict_df[id]['pd_time'] = date_str +" "+ rt.rt_dict_df[id]['time_str']
                 rt.rt_dict_df[id]['pd_time'] = pd.to_datetime(rt.rt_dict_df[id]['pd_time'], format="%Y%m%d %H:%M:%S")
 
-                wx.info("[RT_BL][baseline_PA]开始更新[{}]的数据基线[{}-{}]".format(id, time_frame_arr[0], time_frame_arr[1]))
+                wx.info("[RT_BL][baseline_PA]开始更新[{}]的PA数据基线[{}-{}]".format(id, time_frame_arr[0], time_frame_arr[1]))
 
                 # 从RT 数据中筛选出 rt_PA_resample_agg_secs 时间长度 （配置文件 10分钟）的交易记录
                 rt_df = rt.rt_dict_df[id].loc[ (rt.rt_dict_df[id]['time_stamp'] >= begin_t_stamp) & ( rt.rt_dict_df[id]['time_stamp'] <= end_t_stamp)].copy()
@@ -120,18 +120,14 @@ class rt_bl:
                     id_up_baseline_PA_df = self._pa_df_(id_up_baseline_PA_df, col='amount') # 去极值函数（1倍标准差范围内的向量），获得计算均值的Dataframe
                     id_up_baseline_PA_df = self._pa_df_(id_up_baseline_PA_df, col='pct_chg') # 去极值函数（1倍标准差范围内的向量），获得计算均值的Dataframe
                     id_up_bl_PA_ave = id_up_baseline_PA_df['pa_vector'].mean() # 向量长度均值
-                    # id_up_bl_PA_std = id_up_baseline_PA_df['pa_vector'].std()  # 向量长度标准差
                     id_up_bl_pct_ave = id_up_baseline_PA_df['pct_chg'].mean()  # 涨幅均值
                     id_up_bl_amount_ave = id_up_baseline_PA_df['amount'].mean()  # 涨幅对应的成交金额均值
                     id_up_bl_PA_angle_ave = id_up_baseline_PA_df['pa_angle'].mean() # 向量角度均值
-                    # id_up_bl_PA_angle_std = id_up_baseline_PA_df['pa_angle'].std() # 向量角度标准差
                 else:
                     id_up_bl_PA_ave = 0
-                    # id_up_bl_PA_std = 0
                     id_up_bl_pct_ave = 0
                     id_up_bl_amount_ave = 0
                     id_up_bl_PA_angle_ave = 0
-                    # id_up_bl_PA_angle_std = 0
 
                 # 下跌向量，去极值后，求均值 标准差
                 id_down_baseline_PA_df = id_baseline_PA_df.loc[id_baseline_PA_df['pct_up_down']<0,]
@@ -141,26 +137,22 @@ class rt_bl:
                     id_down_baseline_PA_df = self._pa_df_(id_down_baseline_PA_df, col='amount')
                     id_down_baseline_PA_df = self._pa_df_(id_down_baseline_PA_df, col='pct_chg')
                     id_down_bl_PA_ave = id_down_baseline_PA_df['pa_vector'].mean()
-                    # id_down_bl_PA_std = id_down_baseline_PA_df['pa_vector'].std()
                     id_down_bl_pct_ave = -1 * id_down_baseline_PA_df['pct_chg'].mean()  # 跌幅均值，转换成负数
                     id_down_bl_amount_ave = id_down_baseline_PA_df['amount'].mean()  # 跌幅对应的成交金额均值
                     id_down_bl_PA_angle_ave = -1 * id_down_baseline_PA_df['pa_angle'].mean() # 向量角度均值
-                    # id_down_bl_PA_angle_std = -1 * id_down_baseline_PA_df['pa_angle'].std() # 向量角度标准差
                 else:
                     id_down_bl_PA_ave = 0
-                    # id_down_bl_PA_std = 0
                     id_down_bl_pct_ave = 0
                     id_down_bl_amount_ave = 0
                     id_down_bl_PA_angle_ave = 0
-                    # id_down_bl_PA_angle_std = 0
 
                 pa_baseline = {"id":id, "date":date_str,"t_frame":"-".join(agg_t_frame), "sample_time":self.rt_PA_resample_secs,
-                               "up_bl_pa_ave":id_up_bl_PA_ave, #"up_bl_pa_std":id_up_bl_PA_std,
+                               "up_bl_pa_ave":id_up_bl_PA_ave,
                                "up_bl_pct_ave":id_up_bl_pct_ave , "up_bl_amount_ave":id_up_bl_amount_ave ,
-                               "down_bl_pa_ave":id_down_bl_PA_ave, #"down_bl_pa_std":id_down_bl_PA_std,
+                               "down_bl_pa_ave":id_down_bl_PA_ave,
                                "down_bl_pct_ave": id_down_bl_pct_ave, "down_bl_amount_ave": id_down_bl_amount_ave,
-                               "up_bl_pa_angle_ave":id_up_bl_PA_angle_ave,#"up_bl_pa_angle_std":id_up_bl_PA_angle_std,
-                               "down_bl_pa_angle_ave":id_down_bl_PA_angle_ave}#,"down_bl_pa_angle_std":id_down_bl_PA_angle_std}
+                               "up_bl_pa_angle_ave":id_up_bl_PA_angle_ave,
+                               "down_bl_pa_angle_ave":id_down_bl_PA_angle_ave}
 
                 if baseline_PA_df is None or baseline_PA_df.empty:
                     baseline_PA_df = pd.DataFrame([pa_baseline])
@@ -183,10 +175,6 @@ class rt_bl:
             wx.info("[RT_BL][baseline_PA] [{}-{}] 量价基线交易数据为空，退出".format(time_frame_arr[0], time_frame_arr[1]))
             return None
         else:
-            # cols = ['id', 'date', 't_frame', 'sample_time',
-            #         'up_bl_pa_ave', 'up_bl_pa_std','up_bl_pa_angle_ave','up_bl_pa_angle_std','up_bl_pct_ave','up_bl_amount_ave',
-            #         'down_bl_pa_ave', 'down_bl_pa_std','down_bl_pa_angle_ave','down_bl_pa_angle_std','down_bl_pct_ave','down_bl_amount_ave']
-
             cols = ['id', 'date', 't_frame', 'sample_time',
                     'up_bl_pa_ave', 'up_bl_pa_angle_ave', 'up_bl_pct_ave', 'up_bl_amount_ave',
                     'down_bl_pa_ave', 'down_bl_pa_angle_ave', 'down_bl_pct_ave', 'down_bl_amount_ave']
@@ -236,7 +224,7 @@ class rt_bl:
     # time_frame_arr 时间区间，建立一条 大单交易的数据基线
     # 建立成交量、大单数量、大单金额占比 的基线数据，并导入数据库
     # time_frame_arr ['09:30','10:30'] 起止时间段
-    def baseline_big_deal(self, rt=None , date_str=None, time_frame_arr=None ):
+    def set_baseline_big_deal(self, rt=None , date_str=None, time_frame_arr=None ):
         wx = lg.get_handle()
         if date_str is None:
             date_str = datetime.now().strftime("%Y%m%d")
@@ -264,7 +252,7 @@ class rt_bl:
             #             .format(time_frame_arr[0], time_frame_arr[1], rt_begin_timestr, rt_end_timestr))
                 # return None
 
-            wx.info("[RT_BL][baseline_big_deal]开始更新[{}]的数据基线[{}-{}]".format(id, time_frame_arr[0], time_frame_arr[1]))
+            wx.info("[RT_BL][baseline_big_deal]开始更新[{}]的大单数据基线[{}-{}]".format(id, time_frame_arr[0], time_frame_arr[1]))
 
             # 从RT 数据中筛选出 基线时间段 内的交易记录
             rt_df = rt.rt_dict_df[id].loc[ (rt.rt_dict_df[id]['time_stamp'] >= begin_t_stamp) & ( rt.rt_dict_df[id]['time_stamp'] <= end_t_stamp)].copy()
@@ -411,72 +399,148 @@ class rt_bl:
 
     def get_baseline_pa(self, days=1):
         bl_pa = self.db.get_bl_pa(days = days)
-        baseline_pa = pd.DataFrame()
+        std_times = float(self.h_conf.rd_opt('rt_analysis_rules', 'pa_std_times'))
+        len_std_times = float(self.h_conf.rd_opt('rt_analysis_rules', 'pa_length_std_times'))
+        ang_std_times = float(self.h_conf.rd_opt('rt_analysis_rules', 'pa_angle_std_times'))
+        baseline_pa_df = pd.DataFrame()
+        for tmp_df in bl_pa.groupby(bl_pa['id']):
+            each_id_df = tmp_df[1].fillna(0, inplace=False)
+            b_up_pa_ave = each_id_df['up_bl_pa_ave'].groupby(each_id_df['t_frame']).mean()
+            b_up_pa_std = each_id_df['up_bl_pa_ave'].groupby(each_id_df['t_frame']).std()
+            b_up_pa_max = b_up_pa_ave + b_up_pa_std * len_std_times
+            b_up_pa_min = b_up_pa_ave - b_up_pa_std * len_std_times
+            b_up_pa_max.name = 'b_up_pa_max'
+            b_up_pa_min.name = 'b_up_pa_min'
+
+            b_down_pa_ave = each_id_df['down_bl_pa_ave'].groupby(each_id_df['t_frame']).mean()
+            b_down_pa_std = each_id_df['down_bl_pa_ave'].groupby(each_id_df['t_frame']).std()
+            b_down_pa_max = b_down_pa_ave + b_down_pa_std * len_std_times
+            b_down_pa_min = b_down_pa_ave - b_down_pa_std * len_std_times
+            b_down_pa_max.name = 'b_down_pa_max'
+            b_down_pa_min.name = 'b_down_pa_min'
+
+            b_up_ang_ave = each_id_df['up_bl_pa_ang_ave'].groupby(each_id_df['t_frame']).mean()
+            b_up_ang_std = each_id_df['up_bl_pa_ang_ave'].groupby(each_id_df['t_frame']).std()
+            b_up_ang_max = b_up_ang_ave + b_up_ang_std * ang_std_times
+            b_up_ang_min = b_up_ang_ave - b_up_ang_std * ang_std_times
+            b_up_ang_max.name = 'b_up_ang_max'
+            b_up_ang_min.name = 'b_up_ang_min'
+
+            b_down_ang_ave = each_id_df['down_bl_pa_ang_ave'].groupby(each_id_df['t_frame']).mean()
+            b_down_ang_std = each_id_df['down_bl_pa_ang_ave'].groupby(each_id_df['t_frame']).std()
+            b_down_ang_max = b_down_ang_ave + b_down_ang_std * ang_std_times
+            b_down_ang_min = b_down_ang_ave - b_down_ang_std * ang_std_times
+            b_down_ang_max.name = 'b_down_ang_max'
+            b_down_ang_min.name = 'b_down_ang_min'
+
+            b_up_pct_ave = each_id_df['up_bl_pct_ave'].groupby(each_id_df['t_frame']).mean()
+            b_up_pct_std = each_id_df['up_bl_pct_ave'].groupby(each_id_df['t_frame']).std()
+            b_up_pct_max = b_up_pct_ave + b_up_pct_std * std_times
+            b_up_pct_min = b_up_pct_ave - b_up_pct_std * std_times
+            b_up_pct_max.name = 'b_up_pct_max'
+            b_up_pct_min.name = 'b_up_pct_min'
+
+            b_down_pct_ave = each_id_df['down_bl_pct_ave'].groupby(each_id_df['t_frame']).mean()
+            b_down_pct_std = each_id_df['down_bl_pct_ave'].groupby(each_id_df['t_frame']).std()
+            b_down_pct_max = b_down_pct_ave + b_down_pct_std * std_times
+            b_down_pct_min = b_down_pct_ave - b_down_pct_std * std_times
+            b_down_pct_max.name = 'b_down_pct_max'
+            b_down_pct_min.name = 'b_down_pct_min'
+
+            b_up_amount_ave = each_id_df['up_bl_amount_ave'].groupby(each_id_df['t_frame']).mean()
+            b_up_amount_std = each_id_df['up_bl_amount_ave'].groupby(each_id_df['t_frame']).std()
+            b_up_amount_max = b_up_amount_ave + b_up_amount_std * std_times
+            b_up_amount_min = b_up_amount_ave - b_up_amount_std * std_times
+            b_up_amount_max.name = 'b_up_amount_max'
+            b_up_amount_min.name = 'b_up_amount_min'
+
+            b_down_amount_ave = each_id_df['down_bl_amount_ave'].groupby(each_id_df['t_frame']).mean()
+            b_down_amount_std = each_id_df['down_bl_amount_ave'].groupby(each_id_df['t_frame']).std()
+            b_down_amount_max = b_down_amount_ave + b_down_amount_std * std_times
+            b_down_amount_min = b_down_amount_ave - b_down_amount_std * std_times
+            b_down_amount_max.name = 'b_down_amount_max'
+            b_down_amount_min.name = 'b_down_amount_min'
+
+            id_df = pd.concat([b_up_pa_max, b_up_pa_min, b_up_ang_max, b_up_ang_min,
+                               b_up_pct_max, b_up_pct_min, b_up_amount_max, b_up_amount_min,
+                               b_down_pa_max, b_down_pa_min, b_down_ang_max, b_down_ang_min,
+                               b_down_pct_max, b_down_pct_min, b_down_amount_max, b_down_amount_min] , axis=1)
+            id_df['id']=tmp_df[0]
+            if baseline_pa_df is None or baseline_pa_df.empty:
+                baseline_pa_df = id_df
+            else:
+                baseline_pa_df = baseline_pa_df.append(id_df)
+
+        baseline_pa_df.reset_index(drop=False, inplace=True)
+        return baseline_pa_df
+
 
     def get_baseline_big_deal(self, days=3):
         wx = lg.get_handle()
+        # 量价向量 的取样resample的时间段
+        std_times = float(self.h_conf.rd_opt('rt_analysis_rules', 'big_deal_std_times'))
+
         bl_df = self.db.get_bl_big_deal(days=days)
         baseline_bd_df = pd.DataFrame()
         for tmp_df in bl_df.groupby(bl_df['id']):
-            # for each_id_tframe_df in each_id_df[1].groupby(by=['t_frame']):
             each_id_df = tmp_df[1].fillna(0, inplace=False)
             b_qty_ave = each_id_df['big_qty'].groupby(each_id_df['t_frame']).mean()
             b_qty_std = each_id_df['big_qty'].groupby(each_id_df['t_frame']).std()
-            b_qty_max = b_qty_ave + b_qty_std
-            b_qty_min = b_qty_ave - b_qty_std
+            b_qty_max = b_qty_ave + b_qty_std * std_times
+            b_qty_min = b_qty_ave - b_qty_std * std_times
             b_qty_max.name = 'b_qty_max'
             b_qty_min.name = 'b_qty_min'
 
             b_abs_pct_ave = each_id_df['big_abs_pct'].groupby(each_id_df['t_frame']).mean()
             b_abs_pct_std = each_id_df['big_abs_pct'].groupby(each_id_df['t_frame']).std()
-            b_pct_max = b_abs_pct_ave + b_abs_pct_std
-            b_pct_min = b_abs_pct_ave - b_abs_pct_std
+            b_pct_max = b_abs_pct_ave + b_abs_pct_std * std_times
+            b_pct_min = b_abs_pct_ave - b_abs_pct_std * std_times
             b_pct_max.name = 'b_pct_max'
             b_pct_min.name = 'b_pct_min'
 
             b_buy_pct_ave = each_id_df['big_buy_pct'].groupby(each_id_df['t_frame']).mean()
             b_buy_pct_std = each_id_df['big_buy_pct'].groupby(each_id_df['t_frame']).std()
-            b_buy_pct_max = b_buy_pct_ave + b_buy_pct_std
-            b_buy_pct_min = b_buy_pct_ave - b_buy_pct_std
+            b_buy_pct_max = b_buy_pct_ave + b_buy_pct_std * std_times
+            b_buy_pct_min = b_buy_pct_ave - b_buy_pct_std * std_times
             b_buy_pct_max.name = 'b_buy_pct_max'
             b_buy_pct_min.name = 'b_buy_pct_min'
 
             b_sell_pct_ave = each_id_df['big_sell_pct'].groupby(each_id_df['t_frame']).mean()
             b_sell_pct_std = each_id_df['big_sell_pct'].groupby(each_id_df['t_frame']).std()
-            b_sell_pct_max = b_sell_pct_ave + b_sell_pct_std
-            b_sell_pct_min = b_sell_pct_ave - b_sell_pct_std
+            b_sell_pct_max = b_sell_pct_ave + b_sell_pct_std * std_times
+            b_sell_pct_min = b_sell_pct_ave - b_sell_pct_std * std_times
             b_sell_pct_max.name = 'b_sell_pct_max'
             b_sell_pct_min.name = 'b_sell_pct_min'
 
             each_id_df = each_id_df[~(each_id_df['buy_qty'].isin([0]))]
             all_buy_qty_ave = each_id_df['buy_qty'].groupby(each_id_df['t_frame']).mean()
             all_buy_qty_std = each_id_df['buy_qty'].groupby(each_id_df['t_frame']).std()
-            all_buy_qty_max = all_buy_qty_ave + all_buy_qty_std
-            all_buy_qty_min = all_buy_qty_ave - all_buy_qty_std
+            all_buy_qty_max = all_buy_qty_ave + all_buy_qty_std * std_times
+            all_buy_qty_min = all_buy_qty_ave - all_buy_qty_std * std_times
             all_buy_qty_max.name = 'all_buy_qty_max'
             all_buy_qty_min.name = 'all_buy_qty_min'
 
             each_id_df = each_id_df[~(each_id_df['buy_amount'].isin([0]))]
             all_buy_amount_ave = each_id_df['buy_amount'].groupby(each_id_df['t_frame']).mean()
             all_buy_amount_std = each_id_df['buy_amount'].groupby(each_id_df['t_frame']).std()
-            all_buy_amount_max = all_buy_amount_ave + all_buy_amount_std
-            all_buy_amount_min = all_buy_amount_ave - all_buy_amount_std
+            all_buy_amount_max = all_buy_amount_ave + all_buy_amount_std * std_times
+            all_buy_amount_min = all_buy_amount_ave - all_buy_amount_std * std_times
             all_buy_amount_max.name = 'all_buy_amount_max'
             all_buy_amount_min.name = 'all_buy_amount_min'
 
             each_id_df = each_id_df[~(each_id_df['sell_qty'].isin([0]))]
             all_sell_qty_ave = each_id_df['sell_qty'].groupby(each_id_df['t_frame']).mean()
             all_sell_qty_std = each_id_df['sell_qty'].groupby(each_id_df['t_frame']).std()
-            all_sell_qty_max = all_sell_qty_ave + all_sell_qty_std
-            all_sell_qty_min = all_sell_qty_ave - all_sell_qty_std
+            all_sell_qty_max = all_sell_qty_ave + all_sell_qty_std * std_times
+            all_sell_qty_min = all_sell_qty_ave - all_sell_qty_std * std_times
             all_sell_qty_max.name = 'all_sell_qty_max'
             all_sell_qty_min.name = 'all_sell_qty_min'
 
             each_id_df = each_id_df[~(each_id_df['sell_amount'].isin([0]))]
             all_sell_amount_ave = each_id_df['sell_amount'].groupby(each_id_df['t_frame']).mean()
             all_sell_amount_std = each_id_df['sell_amount'].groupby(each_id_df['t_frame']).std()
-            all_sell_amount_max = all_sell_amount_ave + all_sell_amount_std
-            all_sell_amount_min = all_sell_amount_ave - all_sell_amount_std
+            all_sell_amount_max = all_sell_amount_ave + all_sell_amount_std * std_times
+            all_sell_amount_min = all_sell_amount_ave - all_sell_amount_std * std_times
             all_sell_amount_max.name = 'all_sell_amount_max'
             all_sell_amount_min.name = 'all_sell_amount_min'
 
