@@ -133,21 +133,11 @@ class db_ops:
             i += 1
 
         # cols = ['id', 'date', 't_frame', 'sample_time',
-        #         'up_bl_pa_ave', 'up_bl_pa_std', 'up_bl_pa_angle_ave',
-        #         'up_bl_pa_angle_std', 'up_bl_pct_ave', 'up_bl_amount_ave',
-        #         'down_bl_pa_ave', 'down_bl_pa_std', 'down_bl_pa_angle_ave',
-        #         'down_bl_pa_angle_std', 'down_bl_pct_ave', 'down_bl_amount_ave']
+        #         'bl_pa', 'bl_pa_angle', 'bl_pct', 'bl_amount', 'bl_dir']
 
-        # sql = "INSERT INTO "+t_name+" SET id=%s, date=%s, t_frame=%s, sample_time=%s, " \
-        #                             "up_bl_pa_ave=%s, up_bl_pa_std=%s, up_bl_pa_ang_ave=%s, " \
-        #                             "up_bl_pa_ang_std=%s, up_bl_pct_ave=%s, up_bl_amount_ave=%s," \
-        #                             "down_bl_pa_ave=%s, down_bl_pa_std=%s, down_bl_pa_ang_ave=%s, " \
-        #                             "down_bl_pa_ang_std=%s, down_bl_pct_ave=%s, down_bl_amount_ave=%s"
         sql = "REPLACE INTO "+t_name+" SET id=%s, date=%s, t_frame=%s, sample_time=%s, " \
-                                    "up_bl_pa_ave=%s, up_bl_pa_ang_ave=%s, " \
-                                    "up_bl_pct_ave=%s, up_bl_amount_ave=%s," \
-                                    "down_bl_pa_ave=%s, down_bl_pa_ang_ave=%s, " \
-                                    "down_bl_pct_ave=%s, down_bl_amount_ave=%s"
+                                    "bl_pa=%s, bl_pa_ang=%s, " \
+                                    "bl_pct=%s, bl_amount=%s, bl_dir=%s"
         self.cursor.executemany(sql, df_array)
         self.handle.commit()
 

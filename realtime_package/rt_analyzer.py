@@ -26,9 +26,32 @@ class rt_ana:
         self.rt_data_keeper_1 = pd.DataFrame() # 保存 大单记录，作为基线数据
 
         # key:array  时间段开始时间：[时间段结束时间， 下一时间段开始时间]
-        self.t_frame_dict = {'09:30':['10:00','10:05'],'10:05':['10:30','10:35'],'10:35':['11:00','11:05'],
-                             '11:05':['11:30','13:05'],'13:05':['13:30','13:35'],'13:35':['14:00','14:05'],
-                             '14:05':['14:30','14:35'],'14:35':['15:00','']}
+        # self.t_frame_dict = {'09:30':['10:00','10:05'],'10:05':['10:30','10:35'],'10:35':['11:00','11:05'],
+        #                      '11:05':['11:30','13:05'],'13:05':['13:30','13:35'],'13:35':['14:00','14:05'],
+        #                      '14:05':['14:30','14:35'],'14:35':['15:00','']}
+        self.t_frame_dict = {'09:25':['09:40','09:40'],'09:40':['09:50','09:50'],'09:50':['10:00','10:00'],
+                             '10:00':['10:30','10:30'],'10:30':['11:00','11:00'],
+                             '11:00':['11:30','13:00'],'13:00':['13:30','13:30'],'13:30':['14:00','14:00'],
+                             '14:00':['14:30','14:30'],'14:30':['14:40','14:40'],'14:40':['14:50','14:50'],
+                             '14:50':['15:00','']}
+
+        date_str = (date.today()).strftime('%Y%m%d')
+
+        # ['09:30', '10:05', '10:35', '11:05', '13:05', '13:35', '14:05', '14:35']  #
+        # record_stamp_dict = {int(time.mktime(time.strptime(date_str + " 14:30:00", '%Y%m%d %H:%M:%S'))):"14:35",
+        #                     int(time.mktime(time.strptime(date_str + " 14:00:00", '%Y%m%d %H:%M:%S'))):"14:05",
+        #                     int(time.mktime(time.strptime(date_str + " 13:30:00", '%Y%m%d %H:%M:%S'))):"13:35",
+        #                     int(time.mktime(time.strptime(date_str + " 13:00:00", '%Y%m%d %H:%M:%S'))):"13:05",
+        #                     int(time.mktime(time.strptime(date_str + " 11:00:00", '%Y%m%d %H:%M:%S'))):"11:05",
+        #                     int(time.mktime(time.strptime(date_str + " 10:30:00", '%Y%m%d %H:%M:%S'))):"10:35",
+        #                     int(time.mktime(time.strptime(date_str + " 10:00:00", '%Y%m%d %H:%M:%S'))):"10:05",
+        #                     int(time.mktime(time.strptime(date_str + " 09:25:00", '%Y%m%d %H:%M:%S'))):"09:30"}
+
+        self.record_stamp_dict = {}
+        # 用 self.t_frame_dict 的key （时间段的起始时间点）建立 record_stamp_dict 字典
+        for key in self.t_frame_dict.keys():
+            stamp = int(time.mktime(time.strptime(date_str + key, '%Y%m%d%H:%M')))
+            self.record_stamp_dict[stamp] = key
 
 
     def rt_cmp_pa_baseline(self, rt=None, pa_bl_df=None):
@@ -118,12 +141,12 @@ class rt_ana:
                 # 量价向量角度, X轴 涨跌幅度 ， Y轴 成交金额
                 # 数值越小：小金额，大幅度涨跌
                 # 数值越大：大金额，小幅度涨跌
-                rt_pa_df['pa_angle'] = rt_pa_df['amount'] / rt_pa_df['pct_chg_enhanced']
+                rt_pa_df['pa_angle'] = rt_pa_df['amount'] / rt_pa_df['pct_chg_enhanced'] * rt_pa_df['pct_dir']
                 rt_pa_df['id'] = id
                 rt_pa_df.reset_index(drop=False, inplace=True)
                 rt_pa_df['pd_time'] = rt_pa_df['pd_time'].dt.strftime('%Y%m%d %H:%M:%S')
                 rt_pa_df['date'] = rt_pa_df['pd_time'].apply(lambda x:x[0:8])
-                rt_pa_df['t_frame'] = rt_pa_df['pd_time'].apply(lambda x:x[9:])
+                rt_pa_df['time'] = rt_pa_df['pd_time'].apply(lambda x:x[9:])
                 pa_cmp_df = pd.merge(rt_pa_df, id_bl_df, on=['id'], how='left')
 
                 pa_cmp_df['pct_chg'] *= 100
@@ -135,7 +158,7 @@ class rt_ana:
                 # 按照上涨、下跌分类
                 # 开始与基线数据比对
                 cmp_up_dict = {'pa_vector': ['b_up_pa_max', 'b_up_pa_min', 'PA_UP长度-[超高]-', 'PA_UP长度-[超低]-', '[PA_UP向量超长]', '[PA_UP向量超短'], # PA向量长度
-                            'pa_angle': ['b_up_ang_max', 'b_up_ang_min', 'PA_UP角度-[量大幅小]-', 'PA_UP角度-[量小幅大]-', '[PA_UP量大幅小]', '[PA_UP量小幅大'],  # PA向量角度
+                            'pa_angle': ['b_up_ang_max', 'b_up_ang_min', 'PA_UP角度-[量大幅小]-', 'PA_UP角度-[量小幅大]-', '[PA_UP量大幅小]', '[PA_UP量小幅大]'],  # PA向量角度
                             # 'amount': ['b_up_amount_max', 'b_up_amount_min', '大买单金额占比-[超高]-', '大买单金额占比-[超低]-','[B多]大买单净比高', '[B空]大买单净比低'],  # 大单买入金额占比
                             # 'pct_chg': ['b_up_pct_max', 'b_up_pct_min', '大卖单金额占比-[超高]-', '大卖单金额占比-[超低]-', '[B空]大卖单净比高', '[B多]大卖单净比低'],  # 大单卖出金额占比
                             }
@@ -222,7 +245,11 @@ class rt_ana:
                     wx.info("[Rt_Ana][RT_CMP_PA_Baseline] {} {} 已处理完毕，进入下一支股票".format(id, t_frame))
                     break
                 frame_begin_stamp = int(time.mktime(time.strptime(date_str + frame_begin_time_str, '%Y%m%d%H:%M')))
-            return cmp_pa_result
+
+        cols = ['id', 'date', 'time', 'type', 'msg']
+        cmp_pa_result = cmp_pa_result.loc[:, cols]
+
+        return cmp_pa_result
 
 
     def rt_cmp_big_baseline(self, rt=None, big_bl_df=None):
@@ -395,7 +422,7 @@ class rt_ana:
     def _cmp_data_process_2_(self, df=None, type='', key='', val='', msg=''):
         if df is None or len(df)==0:
             return None
-        ret_df = pd.DataFrame(df, columns=['id', 'date','t_frame',  key, val])
+        ret_df = pd.DataFrame(df, columns=['id', 'date','time',  key, val])
         # ret_df[[key, val]] = ret_df[[key, val]].astype(int)
         # ret_df[key] = round(ret_df[key],2)
         # ret_df[val] = round(ret_df[val],2)
@@ -411,25 +438,13 @@ class rt_ana:
         if rt_stamp is None:
             wx.info("[Rt_Ana][Rt_DF_Segment] 初始时间戳为空，退出")
             return None
-
-        date_str = (date.today()).strftime('%Y%m%d')
-
-        # ['09:30', '10:05', '10:35', '11:05', '13:05', '13:35', '14:05', '14:35']  #
-        record_stamp_dict = {int(time.mktime(time.strptime(date_str + " 14:30:00", '%Y%m%d %H:%M:%S'))):"14:35",
-                            int(time.mktime(time.strptime(date_str + " 14:00:00", '%Y%m%d %H:%M:%S'))):"14:05",
-                            int(time.mktime(time.strptime(date_str + " 13:30:00", '%Y%m%d %H:%M:%S'))):"13:35",
-                            int(time.mktime(time.strptime(date_str + " 13:00:00", '%Y%m%d %H:%M:%S'))):"13:05",
-                            int(time.mktime(time.strptime(date_str + " 11:00:00", '%Y%m%d %H:%M:%S'))):"11:05",
-                            int(time.mktime(time.strptime(date_str + " 10:30:00", '%Y%m%d %H:%M:%S'))):"10:35",
-                            int(time.mktime(time.strptime(date_str + " 10:00:00", '%Y%m%d %H:%M:%S'))):"10:05",
-                            int(time.mktime(time.strptime(date_str + " 09:25:00", '%Y%m%d %H:%M:%S'))):"09:30"}
-        record_stamp_arr = list(record_stamp_dict.keys())
+        record_stamp_arr = list(self.record_stamp_dict.keys())
         record_stamp_arr.sort(reverse=True)
-        for stamp in record_stamp_arr:
+        for stamp in record_stamp_arr:  # stamp 的每个时间段的起始时间点
             if stamp > rt_stamp:
                 continue
             else:
-                return [stamp, record_stamp_dict[stamp]]
+                return [stamp, self.record_stamp_dict[stamp]]
         return None
 
     def db_load_into_rt_msg(self, cmp_df = None):

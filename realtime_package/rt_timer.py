@@ -10,30 +10,34 @@ import time
 from tushare_data import ts_data
 
 class wx_timer():
-    def __init__(self):
-        date_str = (date.today()).strftime('%Y%m%d')
+    def __init__(self, date_str=''):
+        if len(date_str) == 0 :
+            date_str = (date.today()).strftime('%Y%m%d')
 
-        self.m_s_time = int(time.mktime(time.strptime(date_str + " 09:30:00", '%Y%m%d %H:%M:%S')))
+        self.m_s_time = int(time.mktime(time.strptime(date_str + " 09:25:00", '%Y%m%d %H:%M:%S')))
         self.m_e_time = int(time.mktime(time.strptime(date_str + " 11:30:00", '%Y%m%d %H:%M:%S')))
-        self.n_s_time = int(time.mktime(time.strptime(date_str + " 13:05:00", '%Y%m%d %H:%M:%S')))
+        self.n_s_time = int(time.mktime(time.strptime(date_str + " 13:00:00", '%Y%m%d %H:%M:%S')))
         self.n_e_time = int(time.mktime(time.strptime(date_str + " 15:00:00", '%Y%m%d %H:%M:%S')))
 
         # get_rt_data 函数中 ，记录上一次查询RT数据的截止时间戳，即下一次查询的开始时间戳，以半小时为界限取整
         # ['09:30', '10:05', '10:35', '11:05', '13:05', '13:35', '14:05', '14:35']  #
-        self.record_stamp_arr = [int(time.mktime(time.strptime(date_str + " 14:35:00", '%Y%m%d %H:%M:%S'))),
-                                 int(time.mktime(time.strptime(date_str + " 14:05:00", '%Y%m%d %H:%M:%S'))),
-                                 int(time.mktime(time.strptime(date_str + " 13:35:00", '%Y%m%d %H:%M:%S'))),
-                                 int(time.mktime(time.strptime(date_str + " 13:05:00", '%Y%m%d %H:%M:%S'))),
-                                 int(time.mktime(time.strptime(date_str + " 11:05:00", '%Y%m%d %H:%M:%S'))),
-                                 int(time.mktime(time.strptime(date_str + " 10:35:00", '%Y%m%d %H:%M:%S'))),
-                                 int(time.mktime(time.strptime(date_str + " 10:05:00", '%Y%m%d %H:%M:%S'))),
-                                 int(time.mktime(time.strptime(date_str + " 09:30:00", '%Y%m%d %H:%M:%S')))]
-        # self.record_stamp_arr.sort(reverse = True)
-        # self.m_s_time = datetime.datetime.strptime(date_str + " 09:30:00", '%Y-%m-%d %H:%M:%S')
-        # self.m_e_time = datetime.datetime.strptime(date_str + " 11:30:00", '%Y-%m-%d %H:%M:%S')
-        # self.n_s_time = datetime.datetime.strptime(date_str + " 13:00:00", '%Y-%m-%d %H:%M:%S')
-        # self.n_e_time = datetime.datetime.strptime(date_str + " 15:00:00", '%Y-%m-%d %H:%M:%S')
+        # self.record_stamp_arr = [int(time.mktime(time.strptime(date_str + " 14:35:00", '%Y%m%d %H:%M:%S'))),
+        #                          int(time.mktime(time.strptime(date_str + " 14:05:00", '%Y%m%d %H:%M:%S'))),
+        #                          int(time.mktime(time.strptime(date_str + " 13:35:00", '%Y%m%d %H:%M:%S'))),
+        #                          int(time.mktime(time.strptime(date_str + " 13:05:00", '%Y%m%d %H:%M:%S'))),
+        #                          int(time.mktime(time.strptime(date_str + " 11:05:00", '%Y%m%d %H:%M:%S'))),
+        #                          int(time.mktime(time.strptime(date_str + " 10:35:00", '%Y%m%d %H:%M:%S'))),
+        #                          int(time.mktime(time.strptime(date_str + " 10:05:00", '%Y%m%d %H:%M:%S'))),
+        #                          int(time.mktime(time.strptime(date_str + " 09:30:00", '%Y%m%d %H:%M:%S')))]
 
+        self.t_frame_dict = {'09:25': ['09:40', '09:40'], '09:40': ['09:50', '09:50'], '09:50': ['10:00', '10:00'],
+                             '10:00': ['10:30', '10:30'], '10:30': ['11:00', '11:00'],
+                             '11:00': ['11:30', '13:00'], '13:00': ['13:30', '13:30'], '13:30': ['14:00', '14:00'],
+                             '14:00': ['14:30', '14:30'], '14:30': ['14:40', '14:40'], '14:40': ['14:50', '14:50'],
+                             '14:50': ['15:00', '']}
+        self.record_stamp_arr = []
+        for key in self.t_frame_dict.keys():
+            self.record_stamp_arr.insert(0, int(time.mktime(time.strptime(date_str + key, '%Y%m%d%H:%M'))))
 
     # 判断 某个日期 是否交易日, date 默认是当日
     def is_trading_date(self, date_str=''):
@@ -78,7 +82,7 @@ class wx_timer():
                     break # 找到第一个小于 当前时间戳的 整数时间
             return [2,t_stamp, record_stamp]
         elif t_stamp > self.m_e_time and t_stamp < self.n_s_time:
-            return [-3, self.n_s_time]
+            return [-3, self.n_s_time, self.n_s_time]
         elif t_stamp >= self.n_s_time and t_stamp <= self.n_e_time:  # 下午交易时间
             for i in self.record_stamp_arr:
                 if i > t_stamp:

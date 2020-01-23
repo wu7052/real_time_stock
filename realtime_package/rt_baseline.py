@@ -37,13 +37,11 @@ class rt_bl:
     # 量价基线内容：采样频率 20S 一次，计算量价向量长度，统计均值 和 标准差
     # time_frame_arr ['09:30','10:30'] 起止时间段
 
-    def set_baseline_PA(self, rt=None, date_str=None, time_frame_arr=None):
+    def set_baseline_PA(self, rt=None, date_str=None, time_frame_arr=None, src=''):
         wx = lg.get_handle()
         if date_str is None or len(date_str) == 0:
             date_str = datetime.now().strftime("%Y%m%d")
-            wx.info("[RT_BL][baseline_PA] 量价基线设立日期：{}".format(date_str))
-        else:
-            wx.info("[RT_BL][baseline_PA] 量价基线设立日期：{}".format(date_str))
+        wx.info("[RT_BL][baseline_PA] [{}--{}]量价基线设立[{}]".format(time_frame_arr[0], time_frame_arr[1], date_str))
 
         # 半个小时 时间段，来自 rebase_rt_data 设定
         t_frame_begin_stamp = int(time.mktime(time.strptime(date_str + time_frame_arr[0], "%Y%m%d%H:%M")))
@@ -57,7 +55,125 @@ class rt_bl:
 
         # 使用 rt_PA_resample_agg_secs 设定的时间段，聚合resample 的数据
         begin_t_stamp = t_frame_begin_stamp
-        icount = (t_frame_end_stamp - t_frame_begin_stamp) // self.rt_PA_resample_agg_secs +1
+        if (t_frame_end_stamp - t_frame_begin_stamp) % self.rt_PA_resample_agg_secs == 0:
+            icount = (t_frame_end_stamp - t_frame_begin_stamp) / self.rt_PA_resample_agg_secs
+        else:
+            icount = (t_frame_end_stamp - t_frame_begin_stamp) // self.rt_PA_resample_agg_secs + 1
+
+        while icount > 0:
+            icount = icount - 1
+            end_t_stamp = begin_t_stamp + self.rt_PA_resample_agg_secs
+            if end_t_stamp > t_frame_end_stamp:
+                end_t_stamp = t_frame_end_stamp
+
+            agg_t_frame = [time.strftime("%H:%M", time.localtime(begin_t_stamp)),
+                           time.strftime("%H:%M", time.localtime(end_t_stamp))]
+
+            for id in rt.rt_dict_df.keys():
+                wx.info("[RT_BL][baseline_PA]开始更新[{}]的PA数据基线[{}-{}]".format(id, agg_t_frame[0], agg_t_frame[1]))
+
+                # 从RT 数据中筛选出 rt_PA_resample_agg_secs 时间长度 （配置文件 10分钟）的交易记录
+                rt_df = rt.rt_dict_df[id].loc[(rt.rt_dict_df[id]['time_stamp'] >= begin_t_stamp) & (
+                            rt.rt_dict_df[id]['time_stamp'] < end_t_stamp)].copy()
+
+                # 增加一列 pandas 的日期格式，用来做 rolling　或 resample 的index列
+                # rt_df['pd_time'] = date_str + " " + rt_df['time_str']
+                # rt_df['pd_time'] = pd.to_datetime(rt_df['pd_time'], format="%Y%m%d %H:%M:%S")
+
+                if rt_df is None or len(rt_df) == 0:
+                    wx.info(
+                        "[RT_BL][baseline_PA][{}] 在[{}-{}] 空交易数据，开始处理下一支股票".format(id, agg_t_frame[0], agg_t_frame[1]))
+                    continue
+                rt_df = rt_df.sort_values(by="time_stamp", ascending=True)
+                rt_df['amount'] = rt_df['price'] * rt_df['vol']
+                # rt_df.set_index('pd_time', inplace=True)
+                rt_df['price'] = pd.to_numeric(rt_df['price'])
+
+                id_baseline_PA_amount = rt_df['amount'].sum()
+                id_baseline_PA_pct_chg = rt_df['price'].max() / rt_df['price'].min() - 1
+                id_baseline_PA_pct_chg_enhanced = id_baseline_PA_pct_chg * 500000000
+
+                # 量价向量长度
+                id_baseline_PA = pow(pow(id_baseline_PA_amount, 2) + pow(id_baseline_PA_pct_chg_enhanced, 2), 0.5)
+
+                # 量价向量方向, Time(High Price) - Time (Low Price) > 0 上涨； <0 下跌, （高价时间 - 低价时间）
+                if rt_df.price.idxmax() > rt_df.price.idxmin():
+                    id_baseline_PA_pct_dir = 1
+                elif rt_df.price.idxmax() < rt_df.price.idxmin():
+                    id_baseline_PA_pct_dir = -1
+                else:
+                    id_baseline_PA_pct_dir = 0
+
+                # 量价向量角度, X轴 涨跌幅度 ， Y轴 成交金额
+                # 数值越小：小金额，大幅度涨跌
+                # 数值越大：大金额，小幅度涨跌
+                if id_baseline_PA_pct_chg_enhanced == 0:
+                    id_baseline_PA_angle = 0
+                else:
+                    id_baseline_PA_angle = id_baseline_PA_amount/ id_baseline_PA_pct_chg_enhanced
+
+                pa_baseline = {"id": id, "date": date_str, "t_frame": "-".join(agg_t_frame),
+                                "sample_time": self.rt_PA_resample_secs,
+                                "bl_pa": id_baseline_PA,
+                                "bl_pa_angle": id_baseline_PA_angle,
+                                "bl_pct": id_baseline_PA_pct_chg,
+                                "bl_amount": id_baseline_PA_amount,
+                                "bl_dir":id_baseline_PA_pct_dir
+                              }
+
+                if baseline_PA_df is None or baseline_PA_df.empty:
+                    baseline_PA_df = pd.DataFrame([pa_baseline])
+                else:
+                    baseline_PA_df = baseline_PA_df.append(pd.DataFrame([pa_baseline]))
+
+            # while 循环，设定下一次的开始时间戳
+            begin_t_stamp = end_t_stamp
+            if end_t_stamp >= t_frame_end_stamp:
+                break
+
+        if baseline_PA_df is None or baseline_PA_df.empty:
+            wx.info("[RT_BL][baseline_PA] [{}-{}] 量价基线交易数据为空，退出".format(time_frame_arr[0], time_frame_arr[1]))
+            return None
+        else:
+            cols = ['id', 'date', 't_frame', 'sample_time',
+                    'bl_pa', 'bl_pa_angle', 'bl_pct', 'bl_amount','bl_dir']
+
+            baseline_PA_df = baseline_PA_df.loc[:, cols]
+            baseline_PA_df.fillna(0, inplace=True)
+            baseline_PA_df.reset_index(drop=True, inplace=True)
+
+            wx.info("[RT_BL][baseline_PA] [{}-{}] 量价数据基线更新完毕".format(time_frame_arr[0], time_frame_arr[1]))
+            return baseline_PA_df
+
+    # 废弃函数
+    def set_baseline_PA_old(self, rt=None, date_str=None, time_frame_arr=None, src=''):
+        wx = lg.get_handle()
+        if date_str is None or len(date_str) == 0:
+            date_str = datetime.now().strftime("%Y%m%d")
+        wx.info("[RT_BL][baseline_PA] [{}][{}--{}]量价基线设立".format(date_str, time_frame_arr[0],time_frame_arr[1]))
+
+        # 半个小时 时间段，来自 rebase_rt_data 设定
+        t_frame_begin_stamp = int(time.mktime(time.strptime(date_str + time_frame_arr[0], "%Y%m%d%H:%M")))
+        t_frame_end_stamp = int(time.mktime(time.strptime(date_str + time_frame_arr[1], "%Y%m%d%H:%M")))
+
+        # 163 数据源，开始时间 后退5分钟
+        if src == '163':
+            t_frame_begin_stamp -= 300
+            time_frame_arr[0] = time.strftime("%H:%M", time.localtime(t_frame_begin_stamp))
+
+        # 基线起止时间颠倒，互换
+        if t_frame_begin_stamp > t_frame_end_stamp:
+            t_frame_begin_stamp, t_frame_end_stamp = t_frame_end_stamp, t_frame_begin_stamp
+
+        baseline_PA_df = pd.DataFrame()
+
+        # 使用 rt_PA_resample_agg_secs 设定的时间段，聚合resample 的数据
+        begin_t_stamp = t_frame_begin_stamp
+        if (t_frame_end_stamp - t_frame_begin_stamp) % self.rt_PA_resample_agg_secs == 0:
+            icount = (t_frame_end_stamp - t_frame_begin_stamp) / self.rt_PA_resample_agg_secs
+        else:
+            icount = (t_frame_end_stamp - t_frame_begin_stamp) // self.rt_PA_resample_agg_secs +1
+
         while icount > 0:
             icount = icount -1
             end_t_stamp = begin_t_stamp + self.rt_PA_resample_agg_secs
@@ -69,39 +185,52 @@ class rt_bl:
 
             for id in rt.rt_dict_df.keys():
                 id_baseline_PA_df = pd.DataFrame()
-                # 增加一列 pandas 的日期格式，用来做 rolling　或 resample 的index列
-                rt.rt_dict_df[id]['pd_time'] = date_str +" "+ rt.rt_dict_df[id]['time_str']
-                rt.rt_dict_df[id]['pd_time'] = pd.to_datetime(rt.rt_dict_df[id]['pd_time'], format="%Y%m%d %H:%M:%S")
 
-                wx.info("[RT_BL][baseline_PA]开始更新[{}]的PA数据基线[{}-{}]".format(id, time_frame_arr[0], time_frame_arr[1]))
+                wx.info("[RT_BL][baseline_PA]开始更新[{}]的PA数据基线[{}-{}]".format(id, agg_t_frame[0], agg_t_frame[1]))
 
                 # 从RT 数据中筛选出 rt_PA_resample_agg_secs 时间长度 （配置文件 10分钟）的交易记录
                 rt_df = rt.rt_dict_df[id].loc[ (rt.rt_dict_df[id]['time_stamp'] >= begin_t_stamp) & ( rt.rt_dict_df[id]['time_stamp'] <= end_t_stamp)].copy()
+
+                # 增加一列 pandas 的日期格式，用来做 rolling　或 resample 的index列
+                rt_df['pd_time'] = date_str +" "+ rt_df['time_str']
+                rt_df['pd_time'] = pd.to_datetime(rt_df['pd_time'], format="%Y%m%d %H:%M:%S")
+
                 if rt_df is None or len(rt_df) == 0:
-                    wx.info("[RT_BL][baseline_PA][{}] 在[{}-{}] 空交易数据，开始处理下一支股票".format(id, time_frame_arr[0], time_frame_arr[1]))
+                    wx.info("[RT_BL][baseline_PA][{}] 在[{}-{}] 空交易数据，开始处理下一支股票".format(id, agg_t_frame[0], agg_t_frame[1]))
                     continue
                 rt_df = rt_df.sort_values(by="time_stamp", ascending=True)
                 rt_df['amount'] = rt_df['price']*rt_df['vol']
                 rt_df.set_index('pd_time', inplace=True)
                 rt_df['price'] = pd.to_numeric(rt_df['price'])
 
-                id_baseline_PA_df['amount'] = rt_df['amount'].resample(self.rt_PA_resample_secs ).sum()
-                id_baseline_PA_df['min_price'] = rt_df['price'].resample(self.rt_PA_resample_secs ).min()
-                id_baseline_PA_df['max_price'] = rt_df['price'].resample(self.rt_PA_resample_secs ).max()
-                id_baseline_PA_df['pct_chg'] = id_baseline_PA_df['max_price'] / id_baseline_PA_df['min_price'] -1
-                id_baseline_PA_df['pct_chg_enhanced'] = (id_baseline_PA_df['max_price'] / id_baseline_PA_df['min_price'] -1 )*500000000
+                id_baseline_PA_df['amount'] = rt_df['amount'].sum()
+                id_baseline_PA_df['min_price'] = rt_df['price'].min()
+                id_baseline_PA_df['max_price'] = rt_df['price'].max()
+                id_baseline_PA_df['pct_chg'] = id_baseline_PA_df['max_price'] / id_baseline_PA_df['min_price'] - 1
+                id_baseline_PA_df['pct_chg_enhanced'] = (id_baseline_PA_df['max_price'] / id_baseline_PA_df['min_price'] - 1) * 500000000
 
                 # Time(High Price) - Time (Low Price) > 0 上涨； >0 下跌, （高价时间 - 低价时间）
-                id_baseline_PA_df['pct_up_down'] = rt_df['price'].resample(self.rt_PA_resample_secs ).apply(lambda x: x.idxmax()- x.idxmin()
+                id_baseline_PA_df['pct_up_down'] = rt_df.price.idxmax() - rt_df.price.idxmin()
+                # 将 pd.datetime64 之差 转换成 float 类型，方便判断 时间切片内的涨跌
+                id_baseline_PA_df['pct_up_down'] = pd.to_numeric(rt_df.price.idxmax() - rt_df.price.idxmin())
+
+                """
+                id_baseline_PA_df['amount'] = rt_df['amount'].resample(self.rt_PA_resample_secs, label='left', closed='left' ).sum()
+                id_baseline_PA_df['min_price'] = rt_df['price'].resample(self.rt_PA_resample_secs, label='left', closed='left'  ).min()
+                id_baseline_PA_df['max_price'] = rt_df['price'].resample(self.rt_PA_resample_secs, label='left', closed='left'  ).max()
+                id_baseline_PA_df['pct_chg'] = id_baseline_PA_df['max_price'] / id_baseline_PA_df['min_price'] -1
+                id_baseline_PA_df['pct_chg_enhanced'] = (id_baseline_PA_df['max_price'] / id_baseline_PA_df['min_price'] -1 )*500000000
+                
+                # Time(High Price) - Time (Low Price) > 0 上涨； >0 下跌, （高价时间 - 低价时间）
+                id_baseline_PA_df['pct_up_down'] = rt_df['price'].resample(self.rt_PA_resample_secs, label='left', closed='left'  ).apply(lambda x: x.idxmax()- x.idxmin()
                                                         if len(x) > 0
                                                         else (pd.to_datetime(0)-pd.to_datetime(0)))
+                """
 
                 id_baseline_PA_df.fillna(0, inplace=True)
 
                 # 過濾掉 成交量 == 0 & 價格變動 ==0 的 時間段記錄
                 id_baseline_PA_df = id_baseline_PA_df.loc[(id_baseline_PA_df['amount'] > 0)&(id_baseline_PA_df['pct_chg_enhanced'] >0),]
-                # 将 pd.datetime64 之差 转换成 float 类型，方便判断 时间切片内的涨跌
-                id_baseline_PA_df['pct_up_down'] = pd.to_numeric(id_baseline_PA_df['pct_up_down'])
 
                 # 量价向量长度
                 id_baseline_PA_df['pa_vector'] = pow( pow(id_baseline_PA_df['amount'],2) + pow(id_baseline_PA_df['pct_chg_enhanced'],2),0.5)
@@ -221,20 +350,23 @@ class rt_bl:
         pa_df = pa_df.loc[ (pa_df[col]<=vec_max )&(pa_df[col]>=vec_min),]
         return pa_df
 
-    # time_frame_arr 时间区间，建立一条 大单交易的数据基线
+    # time_frame_arr 时间区间，建立一条 大单交易的数据基线，传入参数是真实的时间
     # 建立成交量、大单数量、大单金额占比 的基线数据，并导入数据库
     # time_frame_arr ['09:30','10:30'] 起止时间段
-    def set_baseline_big_deal(self, rt=None , date_str=None, time_frame_arr=None ):
+    # 设立基线的时间段，按照真实的交易时间，不用考虑 163 的5分钟偏移
+    def set_baseline_big_deal(self, rt=None , date_str=None, time_frame_arr=None, src=''):
         wx = lg.get_handle()
         if date_str is None:
             date_str = datetime.now().strftime("%Y%m%d")
-            wx.info("[RT_BL][baseline_big_deal] 大单基线设立日期：{}".format(date_str))
-
-        else:
-            wx.info("[RT_BL][baseline_big_deal] 大单基线设立日期：{}".format(date_str))
+        wx.info("[RT_BL][baseline_big_deal] [{}--{}]大单基线设立[{}]".format(time_frame_arr[0], time_frame_arr[1],date_str))
 
         begin_t_stamp = int(time.mktime(time.strptime(date_str+time_frame_arr[0], "%Y%m%d%H:%M")))
         end_t_stamp = int(time.mktime(time.strptime(date_str+time_frame_arr[1], "%Y%m%d%H:%M")))
+
+        # 163 数据源，开始时间 后退5分钟
+        # if src == '163':
+        #     begin_t_stamp -= 300
+            # time_frame_arr[0] = time.strftime("%H:%M", time.localtime(begin_t_stamp))
 
         # 基线起止时间颠倒，互换
         if begin_t_stamp > end_t_stamp:
@@ -242,20 +374,10 @@ class rt_bl:
 
         baseline_big_deal_df = pd.DataFrame()
         for id in rt.rt_dict_df.keys():
-            # rt_end_time = self.rt_dict_df[id]['time_stamp'].max()
-            # rt_begin_time = self.rt_dict_df[id]['time_stamp'].min()
-            # rt_begin_timestr = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(rt_begin_time))
-            # rt_end_timestr = time.strftime("%H:%M:%S", time.localtime(rt_end_time))
-
-            # if begin_t_stamp < rt_begin_time or end_t_stamp > rt_end_time:
-            #     wx.info("[RT_BL][baseline_big_deal] [{}] 设定的基线时间段 [{}-{}] 大于实时数据时间范围 [{}-{}],退出"
-            #             .format(time_frame_arr[0], time_frame_arr[1], rt_begin_timestr, rt_end_timestr))
-                # return None
-
             wx.info("[RT_BL][baseline_big_deal]开始更新[{}]的大单数据基线[{}-{}]".format(id, time_frame_arr[0], time_frame_arr[1]))
 
             # 从RT 数据中筛选出 基线时间段 内的交易记录
-            rt_df = rt.rt_dict_df[id].loc[ (rt.rt_dict_df[id]['time_stamp'] >= begin_t_stamp) & ( rt.rt_dict_df[id]['time_stamp'] <= end_t_stamp)].copy()
+            rt_df = rt.rt_dict_df[id].loc[ (rt.rt_dict_df[id]['time_stamp'] >= begin_t_stamp) & ( rt.rt_dict_df[id]['time_stamp'] < end_t_stamp)].copy()
 
             if rt_df is None or rt_df.empty:
                 wx.info("[RT_BL][baseline_big_deal] [{}] 在[{}-{}]期间交易数据为空，开始处理下一支股票".format(id, time_frame_arr[0], time_frame_arr[1]))
@@ -405,66 +527,36 @@ class rt_bl:
         baseline_pa_df = pd.DataFrame()
         for tmp_df in bl_pa.groupby(bl_pa['id']):
             each_id_df = tmp_df[1].fillna(0, inplace=False)
-            b_up_pa_ave = each_id_df['up_bl_pa_ave'].groupby(each_id_df['t_frame']).mean()
-            b_up_pa_std = each_id_df['up_bl_pa_ave'].groupby(each_id_df['t_frame']).std()
-            b_up_pa_max = b_up_pa_ave + b_up_pa_std * len_std_times
-            b_up_pa_min = b_up_pa_ave - b_up_pa_std * len_std_times
-            b_up_pa_max.name = 'b_up_pa_max'
-            b_up_pa_min.name = 'b_up_pa_min'
+            b_pa_ave = each_id_df['bl_pa'].groupby(each_id_df['t_frame']).mean()
+            b_pa_std = each_id_df['bl_pa'].groupby(each_id_df['t_frame']).std().fillna(0)
+            b_pa_max = b_pa_ave + b_pa_std * len_std_times
+            b_pa_min = b_pa_ave - b_pa_std * len_std_times
+            b_pa_max.name = 'b_pa_max'
+            b_pa_min.name = 'b_pa_min'
 
-            b_down_pa_ave = each_id_df['down_bl_pa_ave'].groupby(each_id_df['t_frame']).mean()
-            b_down_pa_std = each_id_df['down_bl_pa_ave'].groupby(each_id_df['t_frame']).std()
-            b_down_pa_max = b_down_pa_ave + b_down_pa_std * len_std_times
-            b_down_pa_min = b_down_pa_ave - b_down_pa_std * len_std_times
-            b_down_pa_max.name = 'b_down_pa_max'
-            b_down_pa_min.name = 'b_down_pa_min'
+            b_ang_ave = each_id_df['bl_pa_ang'].groupby(each_id_df['t_frame']).mean()
+            b_ang_std = each_id_df['bl_pa_ang'].groupby(each_id_df['t_frame']).std().fillna(0)
+            b_ang_max = b_ang_ave + b_ang_std * ang_std_times
+            b_ang_min = b_ang_ave - b_ang_std * ang_std_times
+            b_ang_max.name = 'b_ang_max'
+            b_ang_min.name = 'b_ang_min'
 
-            b_up_ang_ave = each_id_df['up_bl_pa_ang_ave'].groupby(each_id_df['t_frame']).mean()
-            b_up_ang_std = each_id_df['up_bl_pa_ang_ave'].groupby(each_id_df['t_frame']).std()
-            b_up_ang_max = b_up_ang_ave + b_up_ang_std * ang_std_times
-            b_up_ang_min = b_up_ang_ave - b_up_ang_std * ang_std_times
-            b_up_ang_max.name = 'b_up_ang_max'
-            b_up_ang_min.name = 'b_up_ang_min'
+            b_pct_ave = each_id_df['bl_pct'].groupby(each_id_df['t_frame']).mean()
+            b_pct_std = each_id_df['bl_pct'].groupby(each_id_df['t_frame']).std().fillna(0)
+            b_pct_max = b_pct_ave + b_pct_std * std_times
+            b_pct_min = b_pct_ave - b_pct_std * std_times
+            b_pct_max.name = 'b_pct_max'
+            b_pct_min.name = 'b_pct_min'
 
-            b_down_ang_ave = each_id_df['down_bl_pa_ang_ave'].groupby(each_id_df['t_frame']).mean()
-            b_down_ang_std = each_id_df['down_bl_pa_ang_ave'].groupby(each_id_df['t_frame']).std()
-            b_down_ang_max = b_down_ang_ave + b_down_ang_std * ang_std_times
-            b_down_ang_min = b_down_ang_ave - b_down_ang_std * ang_std_times
-            b_down_ang_max.name = 'b_down_ang_max'
-            b_down_ang_min.name = 'b_down_ang_min'
+            b_amount_ave = each_id_df['bl_amount'].groupby(each_id_df['t_frame']).mean()
+            b_amount_std = each_id_df['bl_amount'].groupby(each_id_df['t_frame']).std().fillna(0)
+            b_amount_max = b_amount_ave + b_amount_std * std_times
+            b_amount_min = b_amount_ave - b_amount_std * std_times
+            b_amount_max.name = 'b_amount_max'
+            b_amount_min.name = 'b_amount_min'
 
-            b_up_pct_ave = each_id_df['up_bl_pct_ave'].groupby(each_id_df['t_frame']).mean()
-            b_up_pct_std = each_id_df['up_bl_pct_ave'].groupby(each_id_df['t_frame']).std()
-            b_up_pct_max = b_up_pct_ave + b_up_pct_std * std_times
-            b_up_pct_min = b_up_pct_ave - b_up_pct_std * std_times
-            b_up_pct_max.name = 'b_up_pct_max'
-            b_up_pct_min.name = 'b_up_pct_min'
-
-            b_down_pct_ave = each_id_df['down_bl_pct_ave'].groupby(each_id_df['t_frame']).mean()
-            b_down_pct_std = each_id_df['down_bl_pct_ave'].groupby(each_id_df['t_frame']).std()
-            b_down_pct_max = b_down_pct_ave + b_down_pct_std * std_times
-            b_down_pct_min = b_down_pct_ave - b_down_pct_std * std_times
-            b_down_pct_max.name = 'b_down_pct_max'
-            b_down_pct_min.name = 'b_down_pct_min'
-
-            b_up_amount_ave = each_id_df['up_bl_amount_ave'].groupby(each_id_df['t_frame']).mean()
-            b_up_amount_std = each_id_df['up_bl_amount_ave'].groupby(each_id_df['t_frame']).std()
-            b_up_amount_max = b_up_amount_ave + b_up_amount_std * std_times
-            b_up_amount_min = b_up_amount_ave - b_up_amount_std * std_times
-            b_up_amount_max.name = 'b_up_amount_max'
-            b_up_amount_min.name = 'b_up_amount_min'
-
-            b_down_amount_ave = each_id_df['down_bl_amount_ave'].groupby(each_id_df['t_frame']).mean()
-            b_down_amount_std = each_id_df['down_bl_amount_ave'].groupby(each_id_df['t_frame']).std()
-            b_down_amount_max = b_down_amount_ave + b_down_amount_std * std_times
-            b_down_amount_min = b_down_amount_ave - b_down_amount_std * std_times
-            b_down_amount_max.name = 'b_down_amount_max'
-            b_down_amount_min.name = 'b_down_amount_min'
-
-            id_df = pd.concat([b_up_pa_max, b_up_pa_min, b_up_ang_max, b_up_ang_min,
-                               b_up_pct_max, b_up_pct_min, b_up_amount_max, b_up_amount_min,
-                               b_down_pa_max, b_down_pa_min, b_down_ang_max, b_down_ang_min,
-                               b_down_pct_max, b_down_pct_min, b_down_amount_max, b_down_amount_min] , axis=1)
+            id_df = pd.concat([b_pa_max, b_pa_min, b_ang_max, b_ang_min,
+                               b_pct_max, b_pct_min, b_amount_max, b_amount_min] , axis=1)
             id_df['id']=tmp_df[0]
             if baseline_pa_df is None or baseline_pa_df.empty:
                 baseline_pa_df = id_df
@@ -485,28 +577,28 @@ class rt_bl:
         for tmp_df in bl_df.groupby(bl_df['id']):
             each_id_df = tmp_df[1].fillna(0, inplace=False)
             b_qty_ave = each_id_df['big_qty'].groupby(each_id_df['t_frame']).mean()
-            b_qty_std = each_id_df['big_qty'].groupby(each_id_df['t_frame']).std()
+            b_qty_std = each_id_df['big_qty'].groupby(each_id_df['t_frame']).std().fillna(0)
             b_qty_max = b_qty_ave + b_qty_std * std_times
             b_qty_min = b_qty_ave - b_qty_std * std_times
             b_qty_max.name = 'b_qty_max'
             b_qty_min.name = 'b_qty_min'
 
             b_abs_pct_ave = each_id_df['big_abs_pct'].groupby(each_id_df['t_frame']).mean()
-            b_abs_pct_std = each_id_df['big_abs_pct'].groupby(each_id_df['t_frame']).std()
+            b_abs_pct_std = each_id_df['big_abs_pct'].groupby(each_id_df['t_frame']).std().fillna(0)
             b_pct_max = b_abs_pct_ave + b_abs_pct_std * std_times
             b_pct_min = b_abs_pct_ave - b_abs_pct_std * std_times
             b_pct_max.name = 'b_pct_max'
             b_pct_min.name = 'b_pct_min'
 
             b_buy_pct_ave = each_id_df['big_buy_pct'].groupby(each_id_df['t_frame']).mean()
-            b_buy_pct_std = each_id_df['big_buy_pct'].groupby(each_id_df['t_frame']).std()
+            b_buy_pct_std = each_id_df['big_buy_pct'].groupby(each_id_df['t_frame']).std().fillna(0)
             b_buy_pct_max = b_buy_pct_ave + b_buy_pct_std * std_times
             b_buy_pct_min = b_buy_pct_ave - b_buy_pct_std * std_times
             b_buy_pct_max.name = 'b_buy_pct_max'
             b_buy_pct_min.name = 'b_buy_pct_min'
 
             b_sell_pct_ave = each_id_df['big_sell_pct'].groupby(each_id_df['t_frame']).mean()
-            b_sell_pct_std = each_id_df['big_sell_pct'].groupby(each_id_df['t_frame']).std()
+            b_sell_pct_std = each_id_df['big_sell_pct'].groupby(each_id_df['t_frame']).std().fillna(0)
             b_sell_pct_max = b_sell_pct_ave + b_sell_pct_std * std_times
             b_sell_pct_min = b_sell_pct_ave - b_sell_pct_std * std_times
             b_sell_pct_max.name = 'b_sell_pct_max'
@@ -514,7 +606,7 @@ class rt_bl:
 
             each_id_df = each_id_df[~(each_id_df['buy_qty'].isin([0]))]
             all_buy_qty_ave = each_id_df['buy_qty'].groupby(each_id_df['t_frame']).mean()
-            all_buy_qty_std = each_id_df['buy_qty'].groupby(each_id_df['t_frame']).std()
+            all_buy_qty_std = each_id_df['buy_qty'].groupby(each_id_df['t_frame']).std().fillna(0)
             all_buy_qty_max = all_buy_qty_ave + all_buy_qty_std * std_times
             all_buy_qty_min = all_buy_qty_ave - all_buy_qty_std * std_times
             all_buy_qty_max.name = 'all_buy_qty_max'
@@ -522,7 +614,7 @@ class rt_bl:
 
             each_id_df = each_id_df[~(each_id_df['buy_amount'].isin([0]))]
             all_buy_amount_ave = each_id_df['buy_amount'].groupby(each_id_df['t_frame']).mean()
-            all_buy_amount_std = each_id_df['buy_amount'].groupby(each_id_df['t_frame']).std()
+            all_buy_amount_std = each_id_df['buy_amount'].groupby(each_id_df['t_frame']).std().fillna(0)
             all_buy_amount_max = all_buy_amount_ave + all_buy_amount_std * std_times
             all_buy_amount_min = all_buy_amount_ave - all_buy_amount_std * std_times
             all_buy_amount_max.name = 'all_buy_amount_max'
@@ -530,7 +622,7 @@ class rt_bl:
 
             each_id_df = each_id_df[~(each_id_df['sell_qty'].isin([0]))]
             all_sell_qty_ave = each_id_df['sell_qty'].groupby(each_id_df['t_frame']).mean()
-            all_sell_qty_std = each_id_df['sell_qty'].groupby(each_id_df['t_frame']).std()
+            all_sell_qty_std = each_id_df['sell_qty'].groupby(each_id_df['t_frame']).std().fillna(0)
             all_sell_qty_max = all_sell_qty_ave + all_sell_qty_std * std_times
             all_sell_qty_min = all_sell_qty_ave - all_sell_qty_std * std_times
             all_sell_qty_max.name = 'all_sell_qty_max'
@@ -538,7 +630,7 @@ class rt_bl:
 
             each_id_df = each_id_df[~(each_id_df['sell_amount'].isin([0]))]
             all_sell_amount_ave = each_id_df['sell_amount'].groupby(each_id_df['t_frame']).mean()
-            all_sell_amount_std = each_id_df['sell_amount'].groupby(each_id_df['t_frame']).std()
+            all_sell_amount_std = each_id_df['sell_amount'].groupby(each_id_df['t_frame']).std().fillna(0)
             all_sell_amount_max = all_sell_amount_ave + all_sell_amount_std * std_times
             all_sell_amount_min = all_sell_amount_ave - all_sell_amount_std * std_times
             all_sell_amount_max.name = 'all_sell_amount_max'

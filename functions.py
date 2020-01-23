@@ -45,7 +45,7 @@ def get_rt_data(rt=None, src='', date_str=''):
         date_str = (datetime.today()).strftime('%Y%m%d')
         wx.info("[Get_RT_Data] 未指定交易日期，默认使用 {}".format(date_str))
 
-    my_timer = wx_timer()
+    my_timer = wx_timer(date_str=date_str)
 
     # 判断 今日期 是否交易日
     if my_timer.is_trading_date(date_str=date_str):
@@ -83,10 +83,13 @@ def get_rt_data(rt=None, src='', date_str=''):
     #     time.sleep(begin_time_stamp-end_time_stamp)
 
     while begin_time_stamp <= end_time_stamp:
-        time_str = time.strftime("%H:%M:%S", time.localtime(begin_time_stamp))
         # rt 对象在主函数生成，传入此函数，添加
-        if src == '163':
-            wx.info("[Get_RT_Data] 从[{}] 查询 [{}]支股票的 交易数据 [{}] ".format(src, len(rt.id_arr), time_str))
+        if src == '163': # 从163 获取数据，时间偏移5分钟
+            time_str = time.strftime("%H:%M:%S", time.localtime(begin_time_stamp+300))
+        else:
+            time_str = time.strftime("%H:%M:%S", time.localtime(begin_time_stamp))
+
+        wx.info("[Get_RT_Data] 从[{}] 查询 [{}]支股票的 交易数据 [{}] ".format(src, len(rt.id_arr), time_str))
 
         for icount, id in enumerate(rt.id_arr):
             # wx.info("[Get_RT_Data][{}:{}] {} 获取逐笔交易数据[{}]".format(icount+1,len(rt.id_arr),id, time_str))
@@ -102,16 +105,17 @@ def get_rt_data(rt=None, src='', date_str=''):
         # 计算下一个循环的 起始时间， 和 文件记录时间，并调整
         begin_time_stamp += time_inc*60
         ret_zone = my_timer.tell_time_zone(t_stamp=begin_time_stamp)
+        record_stamp = ret_zone[2]
         if ret_zone[0] == -3:
             begin_time_stamp = ret_zone[1]
-        elif ret_zone[0] > 0: # 在交易时间内，文件记录时间取整
-            record_stamp = ret_zone[2]
-        elif ret_zone[0] == -5:
-            record_stamp = ret_zone[2]
+        # elif ret_zone[0] > 0: # 在交易时间内，文件记录时间取整
+        #     record_stamp = ret_zone[2]
+        # elif ret_zone[0] == -5:
+        #     record_stamp = ret_zone[2]
 
         # begin_time_stamp == end_time_stamp 再进行一次循环
         # begin_time_stamp > end_time_stamp 且差值 在 time_inc * 60 秒内，设置 begin == end
-        if begin_time_stamp - end_time_stamp > 0 and begin_time_stamp-end_time_stamp < time_inc*60:
+        if begin_time_stamp > end_time_stamp  and begin_time_stamp-end_time_stamp < time_inc*60:
             begin_time_stamp = end_time_stamp
 
     # 文件记录最近一次的实时交易数据时间
@@ -128,11 +132,11 @@ def get_rt_data(rt=None, src='', date_str=''):
 
 def ana_rt_data(rt=None, big_bl_df = None, pa_bl_df =None):
     analyzer = rt_ana()
-    # big_cmp_result = analyzer.rt_cmp_big_baseline(rt = rt, big_bl_df=big_bl_df)
+    big_cmp_result = analyzer.rt_cmp_big_baseline(rt = rt, big_bl_df=big_bl_df)
     # analyzer.db_load_into_rt_msg(cmp_df = big_cmp_result)
-
-    pa_cmp_result = analyzer.rt_cmp_pa_baseline(rt = rt, pa_bl_df = pa_bl_df)
-
+    #
+    # pa_cmp_result = analyzer.rt_cmp_pa_baseline(rt = rt, pa_bl_df = pa_bl_df)
+    # analyzer.db_load_into_rt_msg(cmp_df = pa_cmp_result)
 # rt实时对象，src 数据源
 # 利用全局RT 对象完成 数据收集
 # 创建BL 对象完成 基线设定、导入数据库
@@ -151,10 +155,10 @@ def rebase_rt_data(rt=None, src='', date_str = None):
 
     # 起始时间，作为查询实时交易数据的时间节点
 
-    begin_time_arr= ['09:30','10:05','10:35','11:05','13:05','13:35','14:05','14:35']#
-    # begin_time_arr= ['13:05','13:35','14:05','14:35']#
-    # end_time_arr  = ['13:30','14:00','14:30','15:00']#
-    end_time_arr  = ['10:00','10:30','11:00','11:30','13:30','14:00','14:30','15:00']#
+    # begin_time_arr= ['09:25','09:30']#,'09:40','09:50','10:00','10:30','11:00','13:00','13:30','14:00','14:30','14:40','14:50']#
+    begin_time_arr= ['09:25','09:30','09:40','09:50','10:00','10:30','11:00','13:00','13:30','14:00','14:30','14:40','14:50']#
+    end_time_arr  = ['09:30','09:40','09:50','10:00','10:30','11:00','11:30','13:30','14:00','14:30','14:40','14:50','15:00']#
+    # end_time_arr  = ['09:30','09:40']#,'09:50','10:00','10:30','11:00','11:30','13:30','14:00','14:30','14:40','14:50','15:00']#
 
     # 保持全部的 baseline 数据，去极值后，一次性导入数据库
     final_bl_big_deal_df = pd.DataFrame()
@@ -166,14 +170,13 @@ def rebase_rt_data(rt=None, src='', date_str = None):
         time_inc = 5
         begin_time_stamp = int(time.mktime(time.strptime(date_str+begin_time_arr[index], "%Y%m%d%H:%M")))
         end_time_stamp = int(time.mktime(time.strptime(date_str+end_time_arr[index], "%Y%m%d%H:%M")))
-        while begin_time_stamp  <= end_time_stamp:
-            time_str = time.strftime("%H:%M:%S", time.localtime(begin_time_stamp))
-            # wx.info("{}".format(time_str))
-            begin_time_stamp += time_inc*60
-
+        while begin_time_stamp  < end_time_stamp:
             # rt 对象在主函数生成，传入此函数，添加
             if src == '163':
+                time_str = time.strftime("%H:%M:%S", time.localtime(begin_time_stamp+300))  # 163 的5分钟偏移量
                 wx.info("[Rebase_RT_Data] 从[{}] 获得[{}] 支股票的交易数据 [{}]-[{}] ".format(src, len(rt.id_arr), date_str, time_str ))
+            else:
+                time_str = time.strftime("%H:%M:%S", time.localtime(begin_time_stamp))
 
             for icount, id in enumerate(rt.id_arr):
                 # wx.info("[Get_RT_Data][{}:{}] {} 获取逐笔交易数据[{}]".format(icount+1,len(rt.id_arr),id, time_str))
@@ -185,16 +188,18 @@ def rebase_rt_data(rt=None, src='', date_str = None):
                 else:
                     wx.info("[Rebase_RT_Data][{}/{}] {} [{}--{}]逐笔交易数据[{}-{}]".format(icount+1,len(rt.id_arr),id,time_range[0],time_range[1], date_str, time_str))
                 time.sleep(0.5)
+            #  下一次循环的 起始时间
+            begin_time_stamp += time_inc*60
 
-        # 大单交易的 基线数据，每半小时产生一次
-        baseline_big_deal_df = bl.set_baseline_big_deal(rt=rt, date_str=date_str, time_frame_arr=[begin_time_arr[index], end_time_arr[index]])
+        # 大单交易的 基线数据，每个时间片【begin_time_arr，end_time_arr】 每支股票产生一条记录
+        baseline_big_deal_df = bl.set_baseline_big_deal(rt=rt, date_str=date_str, time_frame_arr=[begin_time_arr[index], end_time_arr[index]], src= src)
         if final_bl_big_deal_df is None or len(final_bl_big_deal_df) == 0:
             final_bl_big_deal_df = baseline_big_deal_df
         else:
             final_bl_big_deal_df = final_bl_big_deal_df.append(baseline_big_deal_df)
 
-        # 量价 基线数据，每半小时产生一次
-        baseline_PA_df = bl.set_baseline_PA(rt=rt, date_str=date_str, time_frame_arr=[begin_time_arr[index], end_time_arr[index]])
+        # 量价 基线数据，每个时间片【begin_time_arr，end_time_arr】 每支股票产生一条记录
+        baseline_PA_df = bl.set_baseline_PA(rt=rt, date_str=date_str, time_frame_arr=[begin_time_arr[index], end_time_arr[index]], src= src)
         if final_bl_pa_df is None or len(final_bl_pa_df) == 0:
             final_bl_pa_df = baseline_PA_df
         else:

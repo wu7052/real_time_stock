@@ -40,12 +40,13 @@ pa_bl_df = bl.get_baseline_pa(days=3)
 
 # 从数据库中统计 过去三天 大单交易、内外盘的基线值
 # 涵盖所有监控的股票
-big_bl_df = bl.get_baseline_big_deal(days=3)
+big_bl_df = bl.get_baseline_big_deal(days=1)
 
 # 开始获得 实时交易数据，并保存到 RT 实时交易对象中
 # 从记录文件中读取 开始时间，当前时间作为截止时间
 if get_rt_data(rt=rt163, src='163', date_str=''):
-    ana_rt_data(rt=rt163, big_bl_df=big_bl_df, pa_bl_df=pa_bl_df)
+    ana_rt_data(rt=rt163, big_bl_df=big_bl_df, pa_bl_df=None)
+    # ana_rt_data(rt=rt163, big_bl_df=big_bl_df, pa_bl_df=pa_bl_df)
 
 
 # rt163.clr_rt_data(minutes=0)
