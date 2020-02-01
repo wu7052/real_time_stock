@@ -1,7 +1,7 @@
-from tushare_data import ts_data
-import re
-from db_package import db_ops
-from conf import conf_handler
+# from tushare_data import ts_data
+# import re
+# from db_package import db_ops
+# from conf import conf_handler
 import new_logger as lg
 from datetime import datetime, timedelta
 import pandas as pd
@@ -48,7 +48,7 @@ class rt_163:
     def __del__(self):
         self.f_record.close()
 
-    def _get_last_record_(self):
+    def _get_last_record_(self, l_num=-1):
         """
         get last line of a file
         :param filename: file name
@@ -61,12 +61,12 @@ class rt_163:
                 return None
             else:
                 with open(self.f_record_name, 'rb') as fp:  # to use seek from end, must use mode 'rb'
-                    offset = -5  # initialize offset
+                    offset = -10  # initialize offset
                     while -offset < filesize:  # offset cannot exceed file size
                         fp.seek(offset, 2)  # read # offset chars from eof(represent by number '2')
                         lines = fp.readlines()  # read from fp to eof
                         if len(lines) >= 2:  # if contains at least 2 lines
-                            return lines[-1].decode()  # then last line is totally included
+                            return lines[l_num].decode()  # then last line is totally included
                         else:
                             offset *= 2  # enlarge offset
                     fp.seek(0)

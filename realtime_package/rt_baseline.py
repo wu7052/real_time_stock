@@ -445,6 +445,7 @@ class rt_bl:
             baseline_big_deal_df = baseline_big_deal_df.loc[:,cols]
             baseline_big_deal_df.fillna(0,inplace=True)
             baseline_big_deal_df.reset_index(drop=True, inplace=True)
+
             wx.info("[RT_BL][baseline_big_deal] [{}-{}]数据基线更新完毕".format(time_frame_arr[0], time_frame_arr[1]))
             return baseline_big_deal_df
 
@@ -566,7 +567,7 @@ class rt_bl:
         baseline_pa_df.reset_index(drop=False, inplace=True)
         return baseline_pa_df
 
-
+    # 废弃函数，暂不需要 大单对比，直接体现在 BI图形
     def get_baseline_big_deal(self, days=3):
         wx = lg.get_handle()
         # 量价向量 的取样resample的时间段
@@ -640,7 +641,7 @@ class rt_bl:
                                b_sell_pct_max, b_sell_pct_min, all_buy_qty_max, all_buy_qty_min,
                                all_buy_amount_max, all_buy_amount_min, all_sell_qty_max, all_sell_qty_min,
                                all_sell_amount_max, all_sell_amount_min]
-                                , axis=1)
+                                , axis=1, sort=False)
             # cols = ['qty_max', 'qty_min' , 'pct_max', 'pct_min', 'buy_pct_max', 'buy_pct_min',
             #         'sell_pct_max', 'sell_pct_min', 'all_buy_qty_max', 'all_buy_qty_min',
             #         'all_buy_amount_max', 'all_buy_amount_min', 'all_sell_qty_max', 'all_sell_qty_min',
@@ -653,4 +654,5 @@ class rt_bl:
                 baseline_bd_df = baseline_bd_df.append(id_df)
 
         baseline_bd_df.reset_index(drop=False, inplace=True)
+        baseline_bd_df.rename(columns={'index':'t_frame'}, inplace=True)
         return baseline_bd_df

@@ -49,7 +49,7 @@ def get_rt_data(rt=None, src='', date_str=''):
 
     # 判断 今日期 是否交易日
     if my_timer.is_trading_date(date_str=date_str):
-        wx.info("今天是交易日，继续运行")
+        wx.info("{}是交易日，继续运行".format(date_str))
     else:
         wx.info("[Get_RT_Data]:{}不是交易日，退出实时交易数据获取 ".format(date_str))
         return None
@@ -82,7 +82,7 @@ def get_rt_data(rt=None, src='', date_str=''):
     #     wx.info("[Get_RT_Data] 查询间隔不足5分钟，需等待{}秒".format(begin_time_stamp-end_time_stamp))
     #     time.sleep(begin_time_stamp-end_time_stamp)
 
-    while begin_time_stamp <= end_time_stamp:
+    while begin_time_stamp < end_time_stamp:
         # rt 对象在主函数生成，传入此函数，添加
         if src == '163': # 从163 获取数据，时间偏移5分钟
             time_str = time.strftime("%H:%M:%S", time.localtime(begin_time_stamp+300))
@@ -115,7 +115,7 @@ def get_rt_data(rt=None, src='', date_str=''):
 
         # begin_time_stamp == end_time_stamp 再进行一次循环
         # begin_time_stamp > end_time_stamp 且差值 在 time_inc * 60 秒内，设置 begin == end
-        if begin_time_stamp > end_time_stamp  and begin_time_stamp-end_time_stamp < time_inc*60:
+        if begin_time_stamp >= end_time_stamp  and begin_time_stamp-end_time_stamp < time_inc*60:
             begin_time_stamp = end_time_stamp
 
     # 文件记录最近一次的实时交易数据时间
@@ -130,9 +130,10 @@ def get_rt_data(rt=None, src='', date_str=''):
     # time_str = (datetime.now()+timedelta(hours=-11)).strftime("%H:%M:%S")
 
 
-def ana_rt_data(rt=None, big_bl_df = None, pa_bl_df =None):
+def ana_rt_data(rt=None, big_bl_df = None, pa_bl_df =None, date_str=None):
     analyzer = rt_ana()
-    big_cmp_result = analyzer.rt_cmp_big_baseline(rt = rt, big_bl_df=big_bl_df)
+    rt_big_bs_stat = analyzer.rt_cmp_big_baseline(rt = rt, big_bl_df=big_bl_df, date_str=date_str)
+    analyzer.db.db_load_into_RT_BL_Big_Deal(df=rt_big_bs_stat)
     # analyzer.db_load_into_rt_msg(cmp_df = big_cmp_result)
     #
     # pa_cmp_result = analyzer.rt_cmp_pa_baseline(rt = rt, pa_bl_df = pa_bl_df)
@@ -179,17 +180,26 @@ def rebase_rt_data(rt=None, src='', date_str = None):
                 time_str = time.strftime("%H:%M:%S", time.localtime(begin_time_stamp))
 
             for icount, id in enumerate(rt.id_arr):
-                # wx.info("[Get_RT_Data][{}:{}] {} 获取逐笔交易数据[{}]".format(icount+1,len(rt.id_arr),id, time_str))
-                json_str = rt.get_json_str(id=id, time_str=time_str)
-                # wx.info("[Get_RT_Data][{}:{}] {} 解析逐笔交易数据[{}]".format(icount+1,len(rt.id_arr),id, time_str))
-                time_range = rt.json_parse(id=id, json_str=json_str)
-                if time_range is None:
-                    wx.info("[Rebase_RT_Data][{}/{}] [{}] [{}-{}] 交易数据不存在".format(icount+1,len(rt.id_arr),id, date_str, time_str))
-                else:
-                    wx.info("[Rebase_RT_Data][{}/{}] {} [{}--{}]逐笔交易数据[{}-{}]".format(icount+1,len(rt.id_arr),id,time_range[0],time_range[1], date_str, time_str))
-                time.sleep(0.5)
+                if src == '163': # 每支股票按 5分钟时间 递增查询，直到 时间递增后超过 end_time_arr[index]
+                    json_str = rt.get_json_str(id=id, time_str=time_str)
+                    time_range = rt.json_parse(id=id, json_str=json_str)
+                    if time_range is None:
+                        wx.info("[Rebase_RT_Data][{}/{}] [{}] [{}-{}] 交易数据不存在".
+                                format(icount + 1, len(rt.id_arr), id,date_str, time_str))
+                    else:
+                        wx.info("[Rebase_RT_Data][{}/{}] {} [{}--{}]逐笔交易数据[{}-{}]".
+                                format(icount + 1, len(rt.id_arr), id, time_range[0], time_range[1], date_str, time_str))
+                    time.sleep(0.5)
+                elif src == 'east':
+                    # 每支股票 按 begin_time_arr[index] - end_time_arr[index] 查询，存入 RT对象
+                    # 完成所有股票后，进入下一个时间段查询
+                    time_range = rt.get_json_str(id=id, time_str = begin_time_arr[index] +"-"+end_time_arr[index])
+
             #  下一次循环的 起始时间
-            begin_time_stamp += time_inc*60
+            if src == '163':
+                begin_time_stamp += time_inc*60
+            elif src == 'east':
+                break  # 已完成所有股票，在本时间段的查询，直接进入下一个时间段查询
 
         # 大单交易的 基线数据，每个时间片【begin_time_arr，end_time_arr】 每支股票产生一条记录
         baseline_big_deal_df = bl.set_baseline_big_deal(rt=rt, date_str=date_str, time_frame_arr=[begin_time_arr[index], end_time_arr[index]], src= src)
@@ -209,9 +219,36 @@ def rebase_rt_data(rt=None, src='', date_str = None):
         rt.clr_rt_data(minutes=15)
     # for循环结束，进入下一个时间段（半小时）
 
-    # 全天交易时间结束，将基线数据导入数据库
-    # 导入数据库
-    bl.db_load_baseline_big_deal(df=final_bl_big_deal_df)
+    # 全天交易时间结束，先做累加
+    # cols = ['id', 'date', 't_frame', 'big_qty', 'big_abs_pct', 'big_io_pct', 'big_buy_pct', 'big_sell_pct',
+    #         'amount', 'sell_qty', 'sell_amount', 'buy_qty', 'buy_amount', 'air_qty', 'air_amount']
+    final_cu_bl_big_deal_df = pd.DataFrame()
+    for each_id in final_bl_big_deal_df.groupby(final_bl_big_deal_df['id']):
+        df_each_id = each_id[1].sort_values(by="t_frame", ascending=True)
+        df_each_id['cu_big_qty'] = df_each_id['big_qty'].cumsum()
+        df_each_id['cu_amount'] = df_each_id['amount'].cumsum()
+        df_each_id['cu_sell_qty'] = df_each_id['sell_qty'].cumsum()
+        df_each_id['cu_sell_amount'] = df_each_id['sell_amount'].cumsum()
+        df_each_id['cu_buy_qty'] = df_each_id['buy_qty'].cumsum()
+        df_each_id['cu_buy_amount'] = df_each_id['buy_amount'].cumsum()
+        df_each_id['cu_air_qty'] = df_each_id['air_qty'].cumsum()
+        df_each_id['cu_air_amount'] = df_each_id['air_amount'].cumsum()
+        if final_cu_bl_big_deal_df is None or len(final_cu_bl_big_deal_df) == 0:
+            final_cu_bl_big_deal_df = df_each_id
+        else:
+            final_cu_bl_big_deal_df = final_cu_bl_big_deal_df.append(df_each_id)
+
+    cols = ['id', 'date', 't_frame', 'big_qty', 'big_abs_pct', 'big_io_pct', 'big_buy_pct', 'big_sell_pct',
+            'amount', 'sell_qty', 'sell_amount', 'buy_qty', 'buy_amount', 'air_qty', 'air_amount',
+            'cu_big_qty','cu_amount','cu_sell_qty','cu_sell_amount','cu_buy_qty','cu_buy_amount',
+            'cu_air_qty','cu_air_amount']
+
+    final_cu_bl_big_deal_df = final_cu_bl_big_deal_df.loc[:, cols]
+    final_cu_bl_big_deal_df.fillna(0, inplace=True)
+    final_cu_bl_big_deal_df.reset_index(drop=True, inplace=True)
+
+    # 将基线数据导入数据库
+    bl.db_load_baseline_big_deal(df=final_cu_bl_big_deal_df)
 
     # 再次对全天的 PA 数据去极值
     # final_bl_pa_df = bl._clr_extreme_data(pa_df=final_bl_pa_df)

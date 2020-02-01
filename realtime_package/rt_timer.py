@@ -68,12 +68,11 @@ class wx_timer():
     def tell_time_zone(self, t_stamp = 0):
         if t_stamp ==0 :
             return [0,0]
-
         self.record_stamp_arr.sort(reverse=True)  #降序排列
 
         if t_stamp < self.m_s_time:  # 早上9:30之前
             return [-1, self.m_s_time]
-        elif t_stamp >= self.m_s_time and t_stamp <= self.m_e_time:  # 上午交易时间
+        elif t_stamp >= self.m_s_time and t_stamp < self.m_e_time:  # 上午交易时间
             for i in self.record_stamp_arr:
                 if i > t_stamp:
                     continue
@@ -81,9 +80,9 @@ class wx_timer():
                     record_stamp = i
                     break # 找到第一个小于 当前时间戳的 整数时间
             return [2,t_stamp, record_stamp]
-        elif t_stamp > self.m_e_time and t_stamp < self.n_s_time:
+        elif t_stamp >= self.m_e_time and t_stamp < self.n_s_time:
             return [-3, self.n_s_time, self.n_s_time]
-        elif t_stamp >= self.n_s_time and t_stamp <= self.n_e_time:  # 下午交易时间
+        elif t_stamp >= self.n_s_time and t_stamp < self.n_e_time:  # 下午交易时间
             for i in self.record_stamp_arr:
                 if i > t_stamp:
                     continue
@@ -91,6 +90,6 @@ class wx_timer():
                     record_stamp = i
                     break # 找到第一个小于 当前时间戳的 整数时间
             return [4, t_stamp, record_stamp]
-        elif t_stamp > self.n_e_time:  # 下午 15:00 以后
+        elif t_stamp >= self.n_e_time:  # 下午 15:00 以后
             date_str = (date.today()).strftime('%Y%m%d')
             return [-5, self.n_e_time, int(time.mktime(time.strptime(date_str + " 15:00:00", '%Y%m%d %H:%M:%S')))]

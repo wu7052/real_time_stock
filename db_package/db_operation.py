@@ -2,6 +2,8 @@ import pymysql
 import new_logger as lg
 import pandas as pd
 from conf import conf_handler
+from datetime import date
+import time
 
 class db_ops:
     wx = lg.get_handle()
@@ -92,11 +94,14 @@ class db_ops:
             i += 1
 
         # cols = ['id', 'date', 't_frame', 'big_qty', 'big_abs_pct', 'big_io_pct', 'big_buy_pct', 'big_sell_pct',
-        #         'amount', 'sell_qty', 'sell_amount', 'buy_qty', 'buy_amount', 'air_qty', 'air_amount']
+        #         'amount', 'sell_qty', 'sell_amount', 'buy_qty', 'buy_amount', 'air_qty', 'air_amount',
+        #         'cu_big_qty', 'cu_amount', 'cu_sell_qty', 'cu_sell_amount', 'cu_buy_qty', 'cu_buy_amount',
+        #         'cu_air_qty', 'cu_air_amount']
 
         sql = "REPLACE INTO "+t_name+" SET id=%s, date=%s, t_frame=%s, big_qty=%s, big_abs_pct=%s, big_io_pct=%s, " \
               "big_buy_pct=%s, big_sell_pct=%s, amount=%s, sell_qty=%s, sell_amount=%s, buy_qty=%s, buy_amount=%s," \
-                                    "air_qty=%s, air_amount=%s"
+              "air_qty=%s, air_amount=%s, cu_big_qty=%s, cu_amount=%s, cu_sell_qty=%s, cu_sell_amount=%s, " \
+                                     "cu_buy_qty=%s, cu_buy_amount=%s, cu_air_qty=%s, cu_air_amount=%s"
         self.cursor.executemany(sql, df_array)
         self.handle.commit()
 
@@ -160,5 +165,16 @@ class db_ops:
         date_str = ",".join(data_arr)
 
         sql = "select * from "+t_name+" where date in ("+date_str+")"
+        ret_df = self._exec_sql(sql=sql)
+        return ret_df
+
+    def get_cu_big_deal_date(self, date_str=None):
+        if date_str is None or len(date_str) == 0:
+            date_str = (date.today()).strftime('%Y%m%d')
+        t_name = self.h_conf.rd_opt('db', 'rt_baseline_big')
+        sql = "select id, sum(big_qty) as cu_big_qty, sum(amount) as cu_amount, " \
+              "sum(buy_qty) as cu_buy_qty, sum(buy_amount) as cu_buy_amount , " \
+              "sum(sell_qty) as cu_sell_qty, sum(sell_amount) as cu_sell_amount " \
+              "from "+ t_name+" where date= "+date_str+" group by id"
         ret_df = self._exec_sql(sql=sql)
         return ret_df

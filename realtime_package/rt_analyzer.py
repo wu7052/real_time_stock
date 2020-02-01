@@ -49,9 +49,9 @@ class rt_ana:
 
         self.record_stamp_dict = {}
         # 用 self.t_frame_dict 的key （时间段的起始时间点）建立 record_stamp_dict 字典
-        for key in self.t_frame_dict.keys():
-            stamp = int(time.mktime(time.strptime(date_str + key, '%Y%m%d%H:%M')))
-            self.record_stamp_dict[stamp] = key
+        for time_str in self.t_frame_dict.keys():
+            stamp = int(time.mktime(time.strptime(date_str + time_str, '%Y%m%d%H:%M')))
+            self.record_stamp_dict[stamp] = time_str
 
 
     def rt_cmp_pa_baseline(self, rt=None, pa_bl_df=None):
@@ -101,7 +101,7 @@ class rt_ana:
                     rt_df = rt.rt_dict_df[id].loc[(rt.rt_dict_df[id]['time_stamp'] >= frame_begin_stamp)].copy()
                 else:
                     rt_df = rt.rt_dict_df[id].loc[(rt.rt_dict_df[id]['time_stamp'] >= frame_begin_stamp) &
-                                                  (rt.rt_dict_df[id]['time_stamp'] <= frame_end_stamp)].copy()
+                                                  (rt.rt_dict_df[id]['time_stamp'] < frame_end_stamp)].copy()
                 if rt_df is None or rt_df.empty:
                     wx.info("[Rt_Ana][RT_CMP_PA_Baseline] [{}] 在[{}]期间交易数据为空，开始处理下一支股票".format(id, t_frame))
                     break
@@ -252,27 +252,38 @@ class rt_ana:
         return cmp_pa_result
 
 
-    def rt_cmp_big_baseline(self, rt=None, big_bl_df=None):
+    def rt_cmp_big_baseline(self, date_str=None, rt=None, big_bl_df=None):
         wx = lg.get_handle()
         rt_dict_df = rt.rt_dict_df
-        date_str = (date.today()).strftime('%Y%m%d')
+        if date_str is None:
+            date_str = (date.today()).strftime('%Y%m%d')
         if rt_dict_df is None:
             wx.info("[Rt_Ana][Rt_Cmp_Big_Baseline] 实时数据字典 是空，退出")
             return None
-        if big_bl_df is None:
-            wx.info("[Rt_Ana][Rt_Cmp_Big_Baseline] 基线数据 是空，退出")
-            return None
+
+        # 暂不需要 big_bl_df 大单基线数据，不需要做对比，直接体现在BI图形上
+        # if big_bl_df is None:
+        #     wx.info("[Rt_Ana][Rt_Cmp_Big_Baseline] 基线数据 是空，退出")
+        #     return None
 
         rt_big_deal_df = pd.DataFrame()
         for id in rt_dict_df.keys():
             if rt_dict_df[id] is None:
                 wx.info("[Rt_Ana][Rt_Cmp_Big_Baseline] {} 未产生实时交易数据，进入下一支股票".format(id))
                 continue
+            if date_str is None:  # 处理当天数据
+                # 起始时间边界对齐
+                [frame_begin_stamp, frame_begin_time_str] = self.rt_df_find_start_stamp(
+                    rt_stamp=rt_dict_df[id]['time_stamp'].min())
+            else:  # 处理历史数据 , 只用来做调试
+                # 起始时间边界对齐
+                # 从记录文件读取上一次查询实时交易的截止时间，本次查询的开始时间
+                # 获得的时间戳有两种情况 1）取整（半小时）的时间戳 2）空文件，自动处理成 09:25
+                # 记录文件名：日期_数据来源
+                frame_begin_time_str = '09:25'
+                frame_begin_stamp = int(time.mktime(time.strptime(date_str + frame_begin_time_str, '%Y%m%d%H:%M')))
 
-            # 起始时间边界对齐
-            [frame_begin_stamp, frame_begin_time_str] = self.rt_df_find_start_stamp(rt_stamp= rt_dict_df[id]['time_stamp'].min())
             end_stamp = rt_dict_df[id].time_stamp.max()
-
             # 按时间段 切片rt数据，计算每个片段的 大单数据，并与基线做比对，再导入基线数据库
             while frame_begin_stamp < end_stamp:
                 # frame_begin_time_str = time.strftime("%H:%M", time.localtime(frame_begin_stamp))
@@ -292,7 +303,7 @@ class rt_ana:
                     rt_df = rt.rt_dict_df[id].loc[(rt.rt_dict_df[id]['time_stamp'] >= frame_begin_stamp)].copy()
                 else:
                     rt_df = rt.rt_dict_df[id].loc[(rt.rt_dict_df[id]['time_stamp'] >= frame_begin_stamp) &
-                                                  (rt.rt_dict_df[id]['time_stamp'] <= frame_end_stamp)].copy()
+                                                  (rt.rt_dict_df[id]['time_stamp'] < frame_end_stamp)].copy()
 
                 if rt_df is None or rt_df.empty:
                     wx.info("[Rt_Ana][Rt_Cmp_Big_Baseline] [{}] 在[{}]期间交易数据为空，开始处理下一支股票".format(id, t_frame))
@@ -358,6 +369,47 @@ class rt_ana:
                     break
                 frame_begin_stamp = int(time.mktime(time.strptime(date_str + frame_begin_time_str, '%Y%m%d%H:%M')))
 
+        cu_big_df = self.db.get_cu_big_deal_date(date_str = date_str)
+        if cu_big_df is None:
+            id_arr = list(rt_dict_df.keys())
+            cu_big_df = pd.DataFrame({'id': list(id_arr), 'cu_big_qty': [float(0)] * len(id_arr), 'cu_amount': [float(0)] * len(id_arr),
+                               'cu_sell_qty': [float(0)] * len(id_arr), 'cu_sell_amount': [float(0)] * len(id_arr),
+                               'cu_buy_qty': [float(0)] * len(id_arr), 'cu_buy_amount': [float(0)] * len(id_arr)})
+
+        final_cu_big_deal_df = pd.DataFrame()
+        for each_id in rt_big_deal_df.groupby(rt_big_deal_df['id']):
+            df_each_id = each_id[1].sort_values(by="t_frame", ascending=True)
+            df_each_id['cu_big_qty'] = df_each_id['big_qty'].cumsum() + \
+                                       cu_big_df.loc[cu_big_df['id']==each_id[0]]['cu_big_qty'].values[0]
+            df_each_id['cu_amount'] = df_each_id['amount'].cumsum()+ \
+                                      cu_big_df.loc[cu_big_df['id']==each_id[0]]['cu_amount'].values[0]
+            df_each_id['cu_sell_qty'] = df_each_id['sell_qty'].cumsum()+\
+                                        cu_big_df.loc[cu_big_df['id']==each_id[0]]['cu_sell_qty'].values[0]
+            df_each_id['cu_sell_amount'] = df_each_id['sell_amount'].cumsum()+ \
+                                           cu_big_df.loc[cu_big_df['id']==each_id[0]]['cu_sell_amount'].values[0]
+            df_each_id['cu_buy_qty'] = df_each_id['buy_qty'].cumsum()+ \
+                                       cu_big_df.loc[cu_big_df['id']==each_id[0]]['cu_buy_qty'].values[0]
+            df_each_id['cu_buy_amount'] = df_each_id['buy_amount'].cumsum()+ \
+                                          cu_big_df.loc[cu_big_df['id']==each_id[0]]['cu_buy_amount'].values[0]
+            df_each_id['cu_air_qty'] = df_each_id['air_qty'].cumsum()
+            df_each_id['cu_air_amount'] = df_each_id['air_amount'].cumsum()
+            if final_cu_big_deal_df is None or len(final_cu_big_deal_df) == 0:
+                final_cu_big_deal_df = df_each_id
+            else:
+                final_cu_big_deal_df = final_cu_big_deal_df.append(df_each_id)
+
+        cols = ['id', 'date', 't_frame', 'big_qty', 'big_abs_pct', 'big_io_pct', 'big_buy_pct', 'big_sell_pct',
+                'amount', 'sell_qty', 'sell_amount', 'buy_qty', 'buy_amount', 'air_qty', 'air_amount',
+                'cu_big_qty', 'cu_amount', 'cu_sell_qty', 'cu_sell_amount', 'cu_buy_qty', 'cu_buy_amount',
+                'cu_air_qty', 'cu_air_amount']
+
+        final_cu_big_deal_df = final_cu_big_deal_df.loc[:, cols]
+        final_cu_big_deal_df.fillna(0, inplace=True)
+        final_cu_big_deal_df.reset_index(drop=True, inplace=True)
+
+        return final_cu_big_deal_df
+
+        """
         if rt_big_deal_df is None or rt_big_deal_df.empty:
             wx.info("[Rt_Ana][Rt_Cmp_Big_Baseline] 大单数据为空，退出")
             return None
@@ -368,9 +420,12 @@ class rt_ana:
             rt_big_deal_df.fillna(0,inplace=True)
             rt_big_deal_df.reset_index(drop=True, inplace=True)
 
+        return rt_big_deal_df
+        """
         # 导入基线数据库
         # self.db.db_load_into_RT_BL_Big_Deal(df=rt_big_deal_df)
 
+        """ 不做统计对比， 直接导入 基线数据库，BI工具图形化展示
         big_cmp_df = pd.merge(rt_big_deal_df, big_bl_df, on=['id','t_frame'], how='left')
 
         cmp_dict = {'big_qty':['b_qty_max', 'b_qty_min','大单数量-[超高]-','大单数量-[超低]-','[B多]大单数量高','[B空]大单数量低'],  # 大单数量
@@ -404,7 +459,7 @@ class rt_ana:
         cmp_result_df = cmp_result_df.loc[:, cols]
 
         return cmp_result_df
-
+        """
     def _cmp_data_process_(self, df=None, type='', key='', val='', msg=''):
         if df is None:
             return None
