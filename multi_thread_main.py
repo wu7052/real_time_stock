@@ -41,7 +41,7 @@ id_arr = xl_h.get_stock_id_from_conf()
 
 
 # 初始化 rt163 对象，用于爬取数据
-rt163 = rt_163(id_arr=id_arr, date_str=None)
+rt163 = rt_163(id_arr=id_arr, date_str='')
 
 # 获得过去N天的交易记录，建立基线
 # rt163.get_std_PV()

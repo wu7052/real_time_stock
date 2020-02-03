@@ -37,7 +37,7 @@ class rt_bl:
     # 量价基线内容：采样频率 20S 一次，计算量价向量长度，统计均值 和 标准差
     # time_frame_arr ['09:30','10:30'] 起止时间段
 
-    def set_baseline_PA(self, rt=None, date_str=None, time_frame_arr=None, src=''):
+    def set_baseline_PA(self, rt=None, date_str='', time_frame_arr=None, src=''):
         wx = lg.get_handle()
         if date_str is None or len(date_str) == 0:
             date_str = datetime.now().strftime("%Y%m%d")
@@ -146,7 +146,7 @@ class rt_bl:
             return baseline_PA_df
 
     # 废弃函数
-    def set_baseline_PA_old(self, rt=None, date_str=None, time_frame_arr=None, src=''):
+    def set_baseline_PA_old(self, rt=None, date_str='', time_frame_arr=None, src=''):
         wx = lg.get_handle()
         if date_str is None or len(date_str) == 0:
             date_str = datetime.now().strftime("%Y%m%d")
@@ -354,9 +354,9 @@ class rt_bl:
     # 建立成交量、大单数量、大单金额占比 的基线数据，并导入数据库
     # time_frame_arr ['09:30','10:30'] 起止时间段
     # 设立基线的时间段，按照真实的交易时间，不用考虑 163 的5分钟偏移
-    def set_baseline_big_deal(self, rt=None , date_str=None, time_frame_arr=None, src=''):
+    def set_baseline_big_deal(self, rt=None , date_str='', time_frame_arr=None, src=''):
         wx = lg.get_handle()
-        if date_str is None:
+        if date_str is None or len(date_str) ==0 :
             date_str = datetime.now().strftime("%Y%m%d")
         wx.info("[RT_BL][baseline_big_deal] [{}--{}]大单基线设立[{}]".format(time_frame_arr[0], time_frame_arr[1],date_str))
 

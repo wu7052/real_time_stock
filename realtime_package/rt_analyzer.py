@@ -26,26 +26,13 @@ class rt_ana:
         self.rt_data_keeper_1 = pd.DataFrame() # 保存 大单记录，作为基线数据
 
         # key:array  时间段开始时间：[时间段结束时间， 下一时间段开始时间]
-        # self.t_frame_dict = {'09:30':['10:00','10:05'],'10:05':['10:30','10:35'],'10:35':['11:00','11:05'],
-        #                      '11:05':['11:30','13:05'],'13:05':['13:30','13:35'],'13:35':['14:00','14:05'],
-        #                      '14:05':['14:30','14:35'],'14:35':['15:00','']}
-        self.t_frame_dict = {'09:25':['09:40','09:40'],'09:40':['09:50','09:50'],'09:50':['10:00','10:00'],
-                             '10:00':['10:30','10:30'],'10:30':['11:00','11:00'],
+        self.t_frame_dict = {'09:25':['09:30','09:30'],'09:30':['09:40','09:40'],'09:40':['09:50','09:50'],
+                             '09:50':['10:00','10:00'],'10:00':['10:30','10:30'],'10:30':['11:00','11:00'],
                              '11:00':['11:30','13:00'],'13:00':['13:30','13:30'],'13:30':['14:00','14:00'],
                              '14:00':['14:30','14:30'],'14:30':['14:40','14:40'],'14:40':['14:50','14:50'],
                              '14:50':['15:00','']}
 
         date_str = (date.today()).strftime('%Y%m%d')
-
-        # ['09:30', '10:05', '10:35', '11:05', '13:05', '13:35', '14:05', '14:35']  #
-        # record_stamp_dict = {int(time.mktime(time.strptime(date_str + " 14:30:00", '%Y%m%d %H:%M:%S'))):"14:35",
-        #                     int(time.mktime(time.strptime(date_str + " 14:00:00", '%Y%m%d %H:%M:%S'))):"14:05",
-        #                     int(time.mktime(time.strptime(date_str + " 13:30:00", '%Y%m%d %H:%M:%S'))):"13:35",
-        #                     int(time.mktime(time.strptime(date_str + " 13:00:00", '%Y%m%d %H:%M:%S'))):"13:05",
-        #                     int(time.mktime(time.strptime(date_str + " 11:00:00", '%Y%m%d %H:%M:%S'))):"11:05",
-        #                     int(time.mktime(time.strptime(date_str + " 10:30:00", '%Y%m%d %H:%M:%S'))):"10:35",
-        #                     int(time.mktime(time.strptime(date_str + " 10:00:00", '%Y%m%d %H:%M:%S'))):"10:05",
-        #                     int(time.mktime(time.strptime(date_str + " 09:25:00", '%Y%m%d %H:%M:%S'))):"09:30"}
 
         self.record_stamp_dict = {}
         # 用 self.t_frame_dict 的key （时间段的起始时间点）建立 record_stamp_dict 字典
@@ -252,11 +239,11 @@ class rt_ana:
         return cmp_pa_result
 
 
-    def rt_cmp_big_baseline(self, date_str=None, rt=None, big_bl_df=None):
+    def rt_cmp_big_baseline(self, date_str='', rt=None, big_bl_df=None):
         wx = lg.get_handle()
         rt_dict_df = rt.rt_dict_df
-        if date_str is None:
-            date_str = (date.today()).strftime('%Y%m%d')
+        # if date_str is None or len(date_str) == 0:
+        #     date_str = (date.today()).strftime('%Y%m%d')
         if rt_dict_df is None:
             wx.info("[Rt_Ana][Rt_Cmp_Big_Baseline] 实时数据字典 是空，退出")
             return None
@@ -271,10 +258,11 @@ class rt_ana:
             if rt_dict_df[id] is None:
                 wx.info("[Rt_Ana][Rt_Cmp_Big_Baseline] {} 未产生实时交易数据，进入下一支股票".format(id))
                 continue
-            if date_str is None:  # 处理当天数据
+            if date_str is None or len(date_str) == 0:  # 处理当天数据
+                date_str = (date.today()).strftime('%Y%m%d')
+
                 # 起始时间边界对齐
-                [frame_begin_stamp, frame_begin_time_str] = self.rt_df_find_start_stamp(
-                    rt_stamp=rt_dict_df[id]['time_stamp'].min())
+                [frame_begin_stamp, frame_begin_time_str] = self.rt_df_find_start_stamp(rt_stamp=rt_dict_df[id]['time_stamp'].min())
             else:  # 处理历史数据 , 只用来做调试
                 # 起始时间边界对齐
                 # 从记录文件读取上一次查询实时交易的截止时间，本次查询的开始时间
@@ -295,9 +283,10 @@ class rt_ana:
                     t_frame = frame_begin_time_str + "-" + frame_end_time_str
                     frame_end_stamp = int(time.mktime(time.strptime(date_str + frame_end_time_str, '%Y%m%d%H:%M')))
 
-                if frame_end_stamp > end_stamp:
-                    wx.info("[Rt_Ana][Rt_Cmp_Big_Baseline] {} {} 已超出本次获取的实时数据范围，进入下一支股票".format(id, t_frame))
-                    break
+                # 采集的实时数据未到 该时间段 结束，仍然继续统计 该时间段内的情况，下面的判断屏蔽掉啦
+                # if frame_end_stamp > end_stamp:
+                #     wx.info("[Rt_Ana][Rt_Cmp_Big_Baseline] {} {} 已超出本次获取的实时数据范围，进入下一支股票".format(id, t_frame))
+                #     break
 
                 if frame_end_time_str == '15:00':  # 15:00 收市后，有最后一笔交易记录 产生在 15:00 之后若干秒
                     rt_df = rt.rt_dict_df[id].loc[(rt.rt_dict_df[id]['time_stamp'] >= frame_begin_stamp)].copy()

@@ -24,16 +24,17 @@ xl_h.rd_file()
 id_arr = xl_h.get_stock_id_from_conf()
 
 # 实时交易对象
-# rt163 = rt_163(id_arr=id_arr, date_str='20200123')
+# rt163 = rt_163(id_arr=id_arr, date_str='')
 
-rteast = rt_east(id_arr=id_arr, date_str='20200123', item_page = '144')
+rteast = rt_east(id_arr=id_arr, date_str='', item_page = '144')
 
 # rt实时对象，src 数据源
 # 利用全局RT 对象完成 数据收集
 # 创建BL 对象完成 基线设定、导入数据库
-# rebase_rt_data(rt=rt163, src='163', date_str = '20200123')
-rebase_rt_data(rt=rteast, src='east', date_str = '20200123')
-
+# 从 163 获得数据
+# rebase_rt_data(rt=rt163, src='163', date_str = '')
+# 从 eastmoney 获得数据
+# rebase_rt_data(rt=rteast, src='east', date_str = '')
 
 # 基线数据对象
 # bl = rt_bl()
@@ -48,8 +49,8 @@ rebase_rt_data(rt=rteast, src='east', date_str = '20200123')
 
 # 开始获得 实时交易数据，并保存到 RT 实时交易对象中
 # 从记录文件中读取 开始时间，当前时间作为截止时间
-# if get_rt_data(rt=rt163, src='163', date_str='20200123'):
-#     ana_rt_data(rt=rt163, big_bl_df=None, pa_bl_df=None, date_str= '20200123')
+if get_rt_data(rt=rteast, src='east', date_str=''):
+    ana_rt_data(rt=rteast, big_bl_df=None, pa_bl_df=None, date_str= '')
     # ana_rt_data(rt=rt163, big_bl_df=big_bl_df, pa_bl_df=pa_bl_df)
 
 

@@ -12,7 +12,7 @@ import chardet
 from urllib import parse
 
 class rt_sina:
-    def __init__(self, id_arr=None, date_str = None, items_page=200):
+    def __init__(self, id_arr=None, date_str = '', items_page=200):
         self.wx = lg.get_handle()
         if id_arr is None:
             self.wx.info("[rt_sina] id_arr is None , __init__ EXIT !")
@@ -21,7 +21,7 @@ class rt_sina:
             self.id_arr = id_arr
             self.items_page = items_page
 
-        if date_str is None:
+        if date_str is None or len(date_str) ==0:
             self.date_str = (date.today()).strftime('%Y-%m-%d')
         else:
             self.date_str = date_str

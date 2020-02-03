@@ -168,7 +168,7 @@ class db_ops:
         ret_df = self._exec_sql(sql=sql)
         return ret_df
 
-    def get_cu_big_deal_date(self, date_str=None):
+    def get_cu_big_deal_date(self, date_str=''):
         if date_str is None or len(date_str) == 0:
             date_str = (date.today()).strftime('%Y%m%d')
         t_name = self.h_conf.rd_opt('db', 'rt_baseline_big')

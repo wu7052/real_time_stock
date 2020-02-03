@@ -61,17 +61,17 @@ class wx_timer():
             return False
 
     # 9:30之前，返回 [-1, 9:30]
-    # 9:30 - 11:30 , 返回 [2, 原时间]
-    # 11:30  - 13:00 之间，返回 [-3, 13:00]
-    # 13:00 - 15:00 之间，返回 [4, 原时间]
-    # 15:00 之后，返回 [-5, 15:00]
+    # 9:30 - 11:30 , 返回 [2, 原时间戳，记入文件的时间戳]
+    # 11:30  - 13:00 之间，返回 [-3, 13:00，记入文件的时间戳 13:00]
+    # 13:00 - 15:00 之间，返回 [4, 原时间，记入文件的时间戳 ]
+    # 15:00 之后，返回 [-5, 15:00， 记入文件的时间戳 15:00]
     def tell_time_zone(self, t_stamp = 0):
         if t_stamp ==0 :
             return [0,0]
         self.record_stamp_arr.sort(reverse=True)  #降序排列
 
-        if t_stamp < self.m_s_time:  # 早上9:30之前
-            return [-1, self.m_s_time]
+        if t_stamp < self.m_s_time:  # 早上9:25之前
+            return [-1, self.m_s_time, self.m_s_time]
         elif t_stamp >= self.m_s_time and t_stamp < self.m_e_time:  # 上午交易时间
             for i in self.record_stamp_arr:
                 if i > t_stamp:

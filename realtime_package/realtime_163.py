@@ -14,7 +14,7 @@ from urllib import parse
 import os
 
 class rt_163:
-    def __init__(self, id_arr=None, date_str = None): #,, items_page=200):  time_frame=180):
+    def __init__(self, id_arr=None, date_str = ''): #,, items_page=200):  time_frame=180):
         wx = lg.get_handle()
         if id_arr is None:
             wx.info("[rt_163] id_arr is None , __init__ EXIT !")
