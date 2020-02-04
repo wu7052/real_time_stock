@@ -66,20 +66,22 @@ def get_rt_data(rt=None, src='', date_str=''):
             begin_time_str = '09:25'
         elif begin_time_str == '15:00':
             wx.info("[Get_RT_Data] 今日文件记录已查询过所有实时交易，退出")
-            return None
+            return False
     elif src == 'east':
         if begin_time_str is None :
             begin_time_str = '09:25'
-        elif begin_time_str == '15:00':
-            wx.info("[Get_RT_Data] 今日文件记录已查询过所有实时交易，退出")
-            return None
         else: # 解析文件记录
             record_dict = json.loads(begin_time_str)
             begin_time_str = record_dict['time_str']
+            if begin_time_str == '15:00':
+                wx.info("[Get_RT_Data] 今日文件记录已查询过所有实时交易，退出")
+                return False
             rt.record_page_dict = record_dict['page']
 
     # 开始 获取实时交易的时间起点，并判断时间是否在交易时间
     begin_time_stamp = int(time.mktime(time.strptime(date_str+begin_time_str[:5], "%Y%m%d%H:%M")))
+    # 返回值，ana_rt_data 的起点时间
+    ret_begin_time_stamp = begin_time_stamp
     ret_zone = my_timer.tell_time_zone(t_stamp = begin_time_stamp)
     if ret_zone[0] < 0:
         begin_time_stamp = ret_zone[1]
@@ -89,6 +91,7 @@ def get_rt_data(rt=None, src='', date_str=''):
     end_time_str = time.strftime('%H:%M', time.localtime(time.time()))
     ret_zone = my_timer.tell_time_zone(t_stamp = end_time_stamp)
     record_stamp = ret_zone[2]
+    record_str = ''
     if ret_zone[0] < 0:
         end_time_stamp = ret_zone[1]
 
@@ -145,9 +148,10 @@ def get_rt_data(rt=None, src='', date_str=''):
         time_str = time.strftime("%H:%M", time.localtime(record_stamp))
         rt.f_record.write('\n'+time_str)
     elif src == 'east':
-        rt.f_record.write('\n'+record_str)
+        if len(record_str) != 0:
+            rt.f_record.write('\n'+record_str)
     rt.f_record.flush()
-    return True
+    return ret_begin_time_stamp
     # 获得当前时间，作为查询实时交易数据的时间节点
     # time_str = time.strftime("%H:%M:%S", time.localtime())
     # time_str = (datetime.datetime.now()).strftime("%H:%M:%S")
@@ -155,9 +159,9 @@ def get_rt_data(rt=None, src='', date_str=''):
     # time_str = (datetime.now()+timedelta(hours=-11)).strftime("%H:%M:%S")
 
 
-def ana_rt_data(rt=None, big_bl_df = None, pa_bl_df =None, date_str=''):
+def ana_rt_data(rt=None, begin_time_stamp=0, big_bl_df = None, pa_bl_df =None, date_str=''):
     analyzer = rt_ana()
-    rt_big_bs_stat = analyzer.rt_cmp_big_baseline(rt = rt, big_bl_df=big_bl_df, date_str=date_str)
+    rt_big_bs_stat = analyzer.rt_cmp_big_baseline(rt = rt, begin_time_stamp = begin_time_stamp, big_bl_df=big_bl_df, date_str=date_str)
     analyzer.db.db_load_into_RT_BL_Big_Deal(df=rt_big_bs_stat)
     # analyzer.db_load_into_rt_msg(cmp_df = big_cmp_result)
     #
@@ -218,7 +222,7 @@ def rebase_rt_data(rt=None, src='', date_str = ''):
                 elif src == 'east':
                     # 每支股票 按 begin_time_arr[index] - end_time_arr[index] 查询，存入 RT对象
                     # 完成所有股票后，进入下一个时间段查询
-                    wx.info("[Rebase_RT_Data][{}/{}] {} 开始获取目标时间段[{}---{}-{}]".
+                    wx.info("[Rebase_RT_Data][{}/{}] ======> {} 开始获取目标时间段[{}---{}-{}]".
                             format(icount + 1, len(rt.id_arr), id, date_str, begin_time_arr[index], end_time_arr[index]))
                     rt.get_json_str(id=id, time_str = begin_time_arr[index] +"-"+end_time_arr[index])
 

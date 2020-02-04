@@ -33,7 +33,7 @@ class rt_east:
         self.item_page = item_page
 
         self.f_record_name = self.date_str + "_east"
-        self.f_record = open(self.f_record_name, "w+")
+        self.f_record = open(self.f_record_name, "a+")
 
         # DataFrame 字典， key = id, value = Dataframe
         # 用来保存 通过rt_east获取的各股票的实时数据DataFrame
@@ -124,7 +124,7 @@ class rt_east:
             wx.info("[RT_East][clr_rt_data] 清理RT对象 全部的详细交易数据")
             self.rt_dict_df.clear()
         else:
-            wx.info("[RT_East][clr_rt_data] RT对象清理 [{}] 前的 详细交易数据".format(time.strftime("%H:%M", time.localtime(stamp))))
+            wx.info("[RT_East][clr_rt_data] RT对象清理 [{}] 前的详细交易数据".format(time.strftime("%H:%M", time.localtime(stamp))))
             for key in self.rt_dict_df.keys():
                 # clr_timestamp = self.rt_dict_df[key]['time_stamp'].max()-minutes*60
                 self.rt_dict_df[key].reset_index(drop=True, inplace=True)
@@ -275,7 +275,8 @@ class rt_east:
         # rt_163_data = [seq, type, price, vol, time_stamp, time_stamp_usec, time_str]
         # df = pd.DataFrame(rt_163_data)
 
-        ret_time_arr = [df1.time_str.min(), df1.time_str.max()]
+        ret_time_arr = [time.strftime('%H:%M:%S', time.localtime(df1.time_stamp.min())),
+                        time.strftime('%H:%M:%S', time.localtime(df1.time_stamp.max()))]
         if id in self.rt_dict_df.keys():
             self.rt_dict_df[id] = self.rt_dict_df[id].append(df1, sort=False).drop_duplicates()
             self.rt_dict_df[id] = self.rt_dict_df[id].sort_values(by="time_str", ascending=False)

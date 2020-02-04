@@ -239,7 +239,7 @@ class rt_ana:
         return cmp_pa_result
 
 
-    def rt_cmp_big_baseline(self, date_str='', rt=None, big_bl_df=None):
+    def rt_cmp_big_baseline(self, date_str='', begin_time_stamp=0, rt=None, big_bl_df=None):
         wx = lg.get_handle()
         rt_dict_df = rt.rt_dict_df
         # if date_str is None or len(date_str) == 0:
@@ -260,16 +260,20 @@ class rt_ana:
                 continue
             if date_str is None or len(date_str) == 0:  # 处理当天数据
                 date_str = (date.today()).strftime('%Y%m%d')
-
-                # 起始时间边界对齐
-                [frame_begin_stamp, frame_begin_time_str] = self.rt_df_find_start_stamp(rt_stamp=rt_dict_df[id]['time_stamp'].min())
-            else:  # 处理历史数据 , 只用来做调试
+            # else:  # 处理历史数据 , 只用来做调试
                 # 起始时间边界对齐
                 # 从记录文件读取上一次查询实时交易的截止时间，本次查询的开始时间
                 # 获得的时间戳有两种情况 1）取整（半小时）的时间戳 2）空文件，自动处理成 09:25
                 # 记录文件名：日期_数据来源
-                frame_begin_time_str = '09:25'
-                frame_begin_stamp = int(time.mktime(time.strptime(date_str + frame_begin_time_str, '%Y%m%d%H:%M')))
+                # frame_begin_time_str = '09:25'
+                # frame_begin_stamp = int(time.mktime(time.strptime(date_str + frame_begin_time_str, '%Y%m%d%H:%M')))
+
+            # 起始时间边界对齐
+            if begin_time_stamp == 0:
+                [frame_begin_stamp, frame_begin_time_str] = self.rt_df_find_start_stamp(
+                    rt_stamp=rt_dict_df[id]['time_stamp'].min())
+            else:
+                [frame_begin_stamp, frame_begin_time_str] = self.rt_df_find_start_stamp(rt_stamp=begin_time_stamp)
 
             end_stamp = rt_dict_df[id].time_stamp.max()
             # 按时间段 切片rt数据，计算每个片段的 大单数据，并与基线做比对，再导入基线数据库
@@ -351,6 +355,8 @@ class rt_ana:
                 else:
                     rt_big_deal_df = rt_big_deal_df.append(pd.DataFrame([rt_data]))
 
+                wx.info("[Rt_Ana][Rt_Cmp_Big_Baseline] [{}] 时间段[{}] 数据处理完毕".format(id, t_frame))
+
                 # 准备进入下一个循环
                 frame_begin_time_str = self.t_frame_dict.get(frame_begin_time_str)[1]
                 if len(frame_begin_time_str) == 0:
@@ -395,7 +401,7 @@ class rt_ana:
         final_cu_big_deal_df = final_cu_big_deal_df.loc[:, cols]
         final_cu_big_deal_df.fillna(0, inplace=True)
         final_cu_big_deal_df.reset_index(drop=True, inplace=True)
-
+        wx.info("[Rt_Ana][Rt_Cmp_Big_Baseline] [{}] 导入 [{}] 条 大单、内外盘记录".format(frame_end_time_str,len(final_cu_big_deal_df)))
         return final_cu_big_deal_df
 
         """

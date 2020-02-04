@@ -28,13 +28,6 @@ id_arr = xl_h.get_stock_id_from_conf()
 
 rteast = rt_east(id_arr=id_arr, date_str='', item_page = '144')
 
-# rt实时对象，src 数据源
-# 利用全局RT 对象完成 数据收集
-# 创建BL 对象完成 基线设定、导入数据库
-# 从 163 获得数据
-# rebase_rt_data(rt=rt163, src='163', date_str = '')
-# 从 eastmoney 获得数据
-# rebase_rt_data(rt=rteast, src='east', date_str = '')
 
 # 基线数据对象
 # bl = rt_bl()
@@ -53,21 +46,3 @@ begin_time_stamp = get_rt_data(rt=rteast, src='east', date_str='')
 if begin_time_stamp != False:
     ana_rt_data(rt=rteast, begin_time_stamp=begin_time_stamp, big_bl_df=None, pa_bl_df=None, date_str= '')
     # ana_rt_data(rt=rt163, big_bl_df=big_bl_df, pa_bl_df=pa_bl_df)
-
-
-# rt163.clr_rt_data(minutes=0)
-print("done")
-
-# url = rt_163.url_encode("14:00:00")
-# json_str = rt_163.get_json_str(id='600026')
-# rt_df = rt_163.json_parse(json_str = json_str)
-# print(rt_df)
-# str_type = chardet.detect("10%3A13%3A34")
-# unicode = lg.str_decode("10%3A13%3A34", str_type['encoding'])
-# print(unicode)
-
-
-# 读取 accounts.xlsx
-# xl_h = xl_handler(f_name="accounts.xlsx")
-# df = xl_h.rd_file()
-# print(df)

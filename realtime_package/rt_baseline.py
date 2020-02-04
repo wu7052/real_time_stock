@@ -41,7 +41,7 @@ class rt_bl:
         wx = lg.get_handle()
         if date_str is None or len(date_str) == 0:
             date_str = datetime.now().strftime("%Y%m%d")
-        wx.info("[RT_BL][baseline_PA] [{}--{}]量价基线设立[{}]".format(time_frame_arr[0], time_frame_arr[1], date_str))
+        # wx.info("[RT_BL][baseline_PA] [{}--{}]量价基线设立[{}]".format(time_frame_arr[0], time_frame_arr[1], date_str))
 
         # 半个小时 时间段，来自 rebase_rt_data 设定
         t_frame_begin_stamp = int(time.mktime(time.strptime(date_str + time_frame_arr[0], "%Y%m%d%H:%M")))
@@ -70,7 +70,6 @@ class rt_bl:
                            time.strftime("%H:%M", time.localtime(end_t_stamp))]
 
             for id in rt.rt_dict_df.keys():
-                wx.info("[RT_BL][baseline_PA]开始更新[{}]的PA数据基线[{}-{}]".format(id, agg_t_frame[0], agg_t_frame[1]))
 
                 # 从RT 数据中筛选出 rt_PA_resample_agg_secs 时间长度 （配置文件 10分钟）的交易记录
                 rt_df = rt.rt_dict_df[id].loc[(rt.rt_dict_df[id]['time_stamp'] >= begin_t_stamp) & (
@@ -141,8 +140,8 @@ class rt_bl:
             baseline_PA_df = baseline_PA_df.loc[:, cols]
             baseline_PA_df.fillna(0, inplace=True)
             baseline_PA_df.reset_index(drop=True, inplace=True)
-
-            wx.info("[RT_BL][baseline_PA] [{}-{}] 量价数据基线更新完毕".format(time_frame_arr[0], time_frame_arr[1]))
+            wx.info("[RT_BL][baseline_PA]      PA数据基线[{}-{}]更新完毕".format(agg_t_frame[0], agg_t_frame[1]))
+            # wx.info("[RT_BL][baseline_PA] [{}-{}] 量价数据基线更新完毕".format(time_frame_arr[0], time_frame_arr[1]))
             return baseline_PA_df
 
     # 废弃函数
@@ -358,7 +357,7 @@ class rt_bl:
         wx = lg.get_handle()
         if date_str is None or len(date_str) ==0 :
             date_str = datetime.now().strftime("%Y%m%d")
-        wx.info("[RT_BL][baseline_big_deal] [{}--{}]大单基线设立[{}]".format(time_frame_arr[0], time_frame_arr[1],date_str))
+        # wx.info("[RT_BL][baseline_big_deal] [{}--{}]大单基线设立[{}]".format(time_frame_arr[0], time_frame_arr[1],date_str))
 
         begin_t_stamp = int(time.mktime(time.strptime(date_str+time_frame_arr[0], "%Y%m%d%H:%M")))
         end_t_stamp = int(time.mktime(time.strptime(date_str+time_frame_arr[1], "%Y%m%d%H:%M")))
@@ -374,7 +373,6 @@ class rt_bl:
 
         baseline_big_deal_df = pd.DataFrame()
         for id in rt.rt_dict_df.keys():
-            wx.info("[RT_BL][baseline_big_deal]开始更新[{}]的大单数据基线[{}-{}]".format(id, time_frame_arr[0], time_frame_arr[1]))
 
             # 从RT 数据中筛选出 基线时间段 内的交易记录
             rt_df = rt.rt_dict_df[id].loc[ (rt.rt_dict_df[id]['time_stamp'] >= begin_t_stamp) & ( rt.rt_dict_df[id]['time_stamp'] < end_t_stamp)].copy()
@@ -445,8 +443,9 @@ class rt_bl:
             baseline_big_deal_df = baseline_big_deal_df.loc[:,cols]
             baseline_big_deal_df.fillna(0,inplace=True)
             baseline_big_deal_df.reset_index(drop=True, inplace=True)
+            wx.info("[RT_BL][baseline_big_deal]大单数据基线[{}-{}]更新完毕".format(time_frame_arr[0], time_frame_arr[1]))
 
-            wx.info("[RT_BL][baseline_big_deal] [{}-{}]数据基线更新完毕".format(time_frame_arr[0], time_frame_arr[1]))
+            # wx.info("[RT_BL][baseline_big_deal] [{}-{}]数据基线更新完毕".format(time_frame_arr[0], time_frame_arr[1]))
             return baseline_big_deal_df
 
 
