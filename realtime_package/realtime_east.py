@@ -206,8 +206,11 @@ class rt_east:
 
                 # 找到 record_stamp 的页面，记录到 self.record_page_dict[id]
                 # 由get_rt_data 返回，并写入文件，作为下次 get_rt_data 读取的第一个页面序号
-                if page_end_time_stamp >= record_stamp and page_start_time_stamp <= record_stamp:
-                    self.record_page_dict[id]= self.rt_page_dict[id]
+                if time.strftime("%H:%M", time.localtime(record_stamp)) != '13:00':
+                    if page_end_time_stamp >= record_stamp and page_start_time_stamp <= record_stamp:
+                        self.record_page_dict[id]= self.rt_page_dict[id]
+                else: # 遇到13:00 做特殊处理，11:30 之前所有页面的时间范围都不包含 13:00, 只需记录到最后一个页号
+                    self.record_page_dict[id] = self.rt_page_dict[id]
 
                 if page_end_time_stamp >= end_time_stamp:
                     wx.info("[RT_East][{}] 第{}页 [{}--{}]逐笔交易数据，已获得目标时间段数据".

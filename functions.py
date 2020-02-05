@@ -222,7 +222,7 @@ def rebase_rt_data(rt=None, src='', date_str = ''):
                 elif src == 'east':
                     # 每支股票 按 begin_time_arr[index] - end_time_arr[index] 查询，存入 RT对象
                     # 完成所有股票后，进入下一个时间段查询
-                    wx.info("[Rebase_RT_Data][{}/{}] ======> {} 开始获取目标时间段[{}---{}-{}]".
+                    wx.info("[Rebase_RT_Data][{}/{}] ==================> {} 开始获取目标时间段[{}---{}-{}]".
                             format(icount + 1, len(rt.id_arr), id, date_str, begin_time_arr[index], end_time_arr[index]))
                     rt.get_json_str(id=id, time_str = begin_time_arr[index] +"-"+end_time_arr[index])
 

@@ -168,13 +168,13 @@ class db_ops:
         ret_df = self._exec_sql(sql=sql)
         return ret_df
 
-    def get_cu_big_deal_date(self, date_str=''):
+    def get_cu_big_deal_date(self, date_str='', t_frame=''):
         if date_str is None or len(date_str) == 0:
             date_str = (date.today()).strftime('%Y%m%d')
         t_name = self.h_conf.rd_opt('db', 'rt_baseline_big')
         sql = "select id, sum(big_qty) as cu_big_qty, sum(amount) as cu_amount, " \
               "sum(buy_qty) as cu_buy_qty, sum(buy_amount) as cu_buy_amount , " \
               "sum(sell_qty) as cu_sell_qty, sum(sell_amount) as cu_sell_amount " \
-              "from "+ t_name+" where date= "+date_str+" group by id"
+              "from "+ t_name+" where date= "+date_str+" and t_frame < '"+t_frame+"' group by id"
         ret_df = self._exec_sql(sql=sql)
         return ret_df

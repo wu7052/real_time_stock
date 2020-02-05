@@ -253,6 +253,10 @@ class rt_ana:
         #     wx.info("[Rt_Ana][Rt_Cmp_Big_Baseline] 基线数据 是空，退出")
         #     return None
 
+        [cu_begin_stamp, cu_begin_time_str] = self.rt_df_find_start_stamp(rt_stamp=begin_time_stamp)
+        cu_end_time_str = self.t_frame_dict.get(cu_begin_time_str)[0]
+        cu_t_frame = cu_begin_time_str+'-'+cu_end_time_str
+
         rt_big_deal_df = pd.DataFrame()
         for id in rt_dict_df.keys():
             if rt_dict_df[id] is None:
@@ -364,7 +368,7 @@ class rt_ana:
                     break
                 frame_begin_stamp = int(time.mktime(time.strptime(date_str + frame_begin_time_str, '%Y%m%d%H:%M')))
 
-        cu_big_df = self.db.get_cu_big_deal_date(date_str = date_str)
+        cu_big_df = self.db.get_cu_big_deal_date(date_str = date_str, t_frame=cu_t_frame)
         if cu_big_df is None:
             id_arr = list(rt_dict_df.keys())
             cu_big_df = pd.DataFrame({'id': list(id_arr), 'cu_big_qty': [float(0)] * len(id_arr), 'cu_amount': [float(0)] * len(id_arr),
