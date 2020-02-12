@@ -46,3 +46,5 @@ begin_time_stamp = get_rt_data(rt=rteast, src='east', date_str='')
 if begin_time_stamp != False:
     ana_rt_data(rt=rteast, begin_time_stamp=begin_time_stamp, big_bl_df=None, pa_bl_df=None, date_str= '')
     # ana_rt_data(rt=rt163, big_bl_df=big_bl_df, pa_bl_df=pa_bl_df)
+
+notice_process(id_arr=id_arr, key_file='', date_arr=None)

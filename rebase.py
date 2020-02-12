@@ -36,3 +36,5 @@ rteast = rt_east(id_arr=id_arr, date_str='', item_page = '144')
 # 从 eastmoney 获得数据
 rebase_rt_data(rt=rteast, src='east', date_str = '')
 
+# 查询上证、深证的公司公告
+notice_process(id_arr=id_arr, key_file='', date_arr=None)

@@ -1,4 +1,4 @@
-from realtime_package import rt_163, rt_east, rt_sina, rt_ana, rt_bl, wx_timer
+from realtime_package import rt_163, rt_east, rt_sina, rt_ana, rt_bl, wx_timer, notice_watcher
 import pandas as pd
 from datetime import datetime, timedelta
 import time
@@ -124,6 +124,10 @@ def get_rt_data(rt=None, src='', date_str=''):
                 # 完成所有股票后，进入下一个时间段查询
                 wx.info("[Get_RT_Data][{}/{}] {} 开始获取目标时间段[{}---{}-{}]".
                         format(icount + 1, len(rt.id_arr), id, date_str, begin_time_str, end_time_str))
+
+                # 临时加入的ID，设置初设页面为0
+                if id not in rt.record_page_dict.keys():
+                    rt.record_page_dict[id] =0
                 rt.get_json_str(id=id, time_str=begin_time_str + "-" + end_time_str, page_num = rt.record_page_dict[id])
 
         if src == '163':
@@ -288,7 +292,35 @@ def rebase_rt_data(rt=None, src='', date_str = ''):
     # final_bl_pa_df = bl._clr_extreme_data(pa_df=final_bl_pa_df)
     bl.db_load_baseline_PA(df=final_bl_pa_df)
 
+def notice_process(id_arr=None, key_file='', date_arr=None):
+    wx = lg.get_handle()
+    if id_arr is None or len(id_arr) == 0:
+        wx.info("[公告获取] 没有指定股票列表，退出")
+        return None
+    if date_arr is None or len(date_arr) == 0:
+        date_arr= [(datetime.today() + timedelta(days=-1)).strftime('%Y-%m-%d'),
+                    (datetime.today() + timedelta(days=1)).strftime('%Y-%m-%d')]
+        wx.info("[公告获取] 使用默认查询时间[{}-{}]".format(date_arr[0], date_arr[1]))
 
+    n_watcher = notice_watcher(id_arr=id_arr, key_file='')
+    sz_notice_df = n_watcher.get_sz_noitce(date_arr = date_arr)
+    sh_notice_df = n_watcher.get_sh_notice(date_arr = date_arr)
+    if sz_notice_df is None or len(sz_notice_df) == 0:
+        all_notice_df = sh_notice_df
+    elif sh_notice_df is None or len(sh_notice_df) == 0:
+        all_notice_df = sz_notice_df
+    else:
+        all_notice_df = sh_notice_df.append(sz_notice_df)
+
+    if all_notice_df is not None and len(all_notice_df) > 0:
+        n_watcher.db.db_load_into_NOTICE(df = all_notice_df)
+        wx.info("[公告获取] 共[{}]条 已导入数据库[{}-{}]".format(len(all_notice_df), date_arr[0], date_arr[1]))
+        n_found_df = n_watcher.noitce_finder(n_df=all_notice_df)
+        wx.info("[公告获取] 关注股票的公告有 [{}] 条".format(n_found_df))
+    else:
+        wx.info("[公告获取] [{}-{}] 上证、深圳无公告发布")
+
+    return all_notice_df
 
 
 

@@ -6,7 +6,7 @@ import new_logger as lg
 lg._init_()
 wx = lg.get_handle()
 from stock_package import ts_data
-from realtime_package import rt_163, rt_bl, rt_ana, rt_east
+from realtime_package import rt_163, rt_bl, rt_ana, rt_east, notice_watcher
 
 # import pandas as pd
 # from assess_package import back_trader
@@ -23,10 +23,13 @@ xl_h = xl_handler(f_name="accounts.xlsx")
 xl_h.rd_file()
 id_arr = xl_h.get_stock_id_from_conf()
 
+notice_process(id_arr=id_arr, key_file='', date_arr=None)
+
+print("done")
 # 实时交易对象
 # rt163 = rt_163(id_arr=id_arr, date_str='')
 
-rteast = rt_east(id_arr=id_arr, date_str='', item_page = '144')
+# rteast = rt_east(id_arr=id_arr, date_str='', item_page = '144')
 
 # rt实时对象，src 数据源
 # 利用全局RT 对象完成 数据收集
@@ -49,14 +52,14 @@ rteast = rt_east(id_arr=id_arr, date_str='', item_page = '144')
 
 # 开始获得 实时交易数据，并保存到 RT 实时交易对象中
 # 从记录文件中读取 开始时间，当前时间作为截止时间
-begin_time_stamp = get_rt_data(rt=rteast, src='east', date_str='')
-if begin_time_stamp != False:
-    ana_rt_data(rt=rteast, begin_time_stamp=begin_time_stamp, big_bl_df=None, pa_bl_df=None, date_str= '')
-    # ana_rt_data(rt=rt163, big_bl_df=big_bl_df, pa_bl_df=pa_bl_df)
-
+# begin_time_stamp = get_rt_data(rt=rteast, src='east', date_str='')
+# if begin_time_stamp != False:
+#     ana_rt_data(rt=rteast, begin_time_stamp=begin_time_stamp, big_bl_df=None, pa_bl_df=None, date_str= '')
+#     ana_rt_data(rt=rt163, big_bl_df=big_bl_df, pa_bl_df=pa_bl_df)
+#
 
 # rt163.clr_rt_data(minutes=0)
-print("done")
+# print("done")
 
 # url = rt_163.url_encode("14:00:00")
 # json_str = rt_163.get_json_str(id='600026')

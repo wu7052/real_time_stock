@@ -178,3 +178,22 @@ class db_ops:
               "from "+ t_name+" where date= "+date_str+" and t_frame < '"+t_frame+"' group by id"
         ret_df = self._exec_sql(sql=sql)
         return ret_df
+
+
+    def db_load_into_NOTICE(self, df = None):
+        wx = lg.get_handle()
+        t_name = self.h_conf.rd_opt('db', 'notice_table')
+
+        if df is None or df.empty:
+            wx.info("[db_load_into_NOTICE] 公告信息为空，退出")
+            return
+        df['title'] = df['title'].apply(lambda x:x[:199])
+        df_array = df.values.tolist()
+        i = 0
+        while i < len(df_array):
+            df_array[i] = tuple(df_array[i])
+            i += 1
+
+        sql = "REPLACE INTO "+ t_name +" SET ann_time=%s, id=%s, title=%s"
+        self.cursor.executemany(sql, df_array)
+        self.handle.commit()

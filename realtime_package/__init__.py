@@ -12,3 +12,4 @@ from realtime_163 import rt_163
 from rt_timer import wx_timer
 from rt_analyzer import rt_ana
 from rt_baseline import rt_bl
+from notice_acquire import notice_watcher
