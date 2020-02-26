@@ -292,7 +292,7 @@ def rebase_rt_data(rt=None, src='', date_str = ''):
     # final_bl_pa_df = bl._clr_extreme_data(pa_df=final_bl_pa_df)
     bl.db_load_baseline_PA(df=final_bl_pa_df)
 
-def notice_process(id_arr=None, key_file='', date_arr=None):
+def notice_process(id_arr=None, keywords_arr=None, date_arr=None):
     wx = lg.get_handle()
     if id_arr is None or len(id_arr) == 0:
         wx.info("[公告获取] 没有指定股票列表，退出")
@@ -302,7 +302,7 @@ def notice_process(id_arr=None, key_file='', date_arr=None):
                     (datetime.today() + timedelta(days=1)).strftime('%Y-%m-%d')]
         wx.info("[公告获取] 使用默认查询时间[{}-{}]".format(date_arr[0], date_arr[1]))
 
-    n_watcher = notice_watcher(id_arr=id_arr, key_file='')
+    n_watcher = notice_watcher(id_arr=id_arr, keywords_arr=keywords_arr)
     sz_notice_df = n_watcher.get_sz_noitce(date_arr = date_arr)
     sh_notice_df = n_watcher.get_sh_notice(date_arr = date_arr)
     if sz_notice_df is None or len(sz_notice_df) == 0:
@@ -315,8 +315,8 @@ def notice_process(id_arr=None, key_file='', date_arr=None):
     if all_notice_df is not None and len(all_notice_df) > 0:
         n_watcher.db.db_load_into_NOTICE(df = all_notice_df)
         wx.info("[公告获取] 共[{}]条 已导入数据库[{}-{}]".format(len(all_notice_df), date_arr[0], date_arr[1]))
-        n_found_df = n_watcher.noitce_finder(n_df=all_notice_df)
-        wx.info("[公告获取] 关注股票的公告有 [{}] 条".format(n_found_df))
+        n_id_found_df = n_watcher.noitce_finder(n_df=all_notice_df)
+        wx.info("[公告获取] 关注股票的公告有 [{}] 条".format(n_id_found_df))
     else:
         wx.info("[公告获取] [{}-{}] 上证、深圳无公告发布")
 

@@ -8,12 +8,15 @@ import requests
 import chardet
 import re
 from db_package import db_ops
+import os
+import sys
 
 class notice_watcher():
-    def __init__(self, id_arr=None, key_file=''):
+    def __init__(self, id_arr=None, keywords_arr=None):
         if id_arr is not None:
             self.id_arr=id_arr
-        self.key_file = key_file
+        if keywords_arr is not None:
+            self.keywords_arr = keywords_arr
 
         # 建立数据库对象
         self.db = db_ops()
@@ -172,15 +175,43 @@ class notice_watcher():
     def noitce_finder(self, n_df=None):
         if n_df is None or len(n_df) == 0:
             return None
-        n_found_df = pd.DataFrame()
-        for id in self.id_arr:
-            tmp = n_df.loc[(n_df['id'] == id)].copy()
-            if tmp is None or len(tmp) == 0:
-                continue
-            if len(n_found_df)==0:
-                n_found_df = tmp
+
+        n_id_found_df = pd.DataFrame()
+        n_keywords_found_df = pd.DataFrame()
+
+        if self.id_arr is not None:
+            for id in self.id_arr:
+                tmp = n_df.loc[(n_df['id'] == id)].copy()
+                if tmp is None or len(tmp) == 0:
+                    continue
+                if len(n_id_found_df)==0:
+                    n_id_found_df = tmp
+                else:
+                    n_id_found_df = n_id_found_df.append(tmp)
+        else:
+            n_id_found_df = None
+
+        n_title_found = pd.DataFrame()
+        for keywords_arr in self.keywords_arr:
+            if keywords_arr is not None and len(keywords_arr) > 0 :
+                # str = '|'.join(keywords_arr)
+                for keyword in keywords_arr:
+                    n_tmp = n_df[n_df.title.str.contains(keyword)].copy()
+                    if n_tmp is not None and len(n_tmp) >0:
+                        n_tmp['keyword'] = keyword
+                    if n_title_found is None or len(n_title_found) == 0:
+                        n_title_found = n_tmp
+                    else:
+                        n_title_found = n_title_found.append(n_tmp)
             else:
-                n_found_df = n_found_df.append(tmp)
-        return n_found_df
+                continue
+        if n_title_found is not None and len(n_title_found) > 0:
+            work_path = os.path.dirname(os.path.abspath(sys.argv[0]))
+            output_path = work_path + '\\log\\'
+            today = date.today().strftime('%Y%m%d')
+            filename = output_path + today + "_公告查询.xlsx"
+
+            n_title_found.to_excel(filename, index=False, sheet_name='公告查询结果', encoding='utf_8_sig')
+        return n_id_found_df
 
 

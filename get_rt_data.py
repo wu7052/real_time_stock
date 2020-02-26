@@ -19,9 +19,13 @@ h_conf = conf_handler(conf="rt_analyer.conf")
 rt_delay = int(h_conf.rd_opt('general', 'rt_delay'))
 
 # 读取 accounts.xlsx
-xl_h = xl_handler(f_name="accounts.xlsx")
-xl_h.rd_file()
-id_arr = xl_h.get_stock_id_from_conf()
+xl_acc = xl_handler(f_name="accounts.xlsx")
+xl_acc.rd_accounts_file()
+id_arr = xl_acc.get_stock_id_from_conf()
+
+#读取 keywords.xlsx
+xl_keywords = xl_handler(f_name="keywords.xlsx")
+keywords_arr = xl_keywords.rd_keywords_file()
 
 # 实时交易对象
 # rt163 = rt_163(id_arr=id_arr, date_str='')
@@ -47,4 +51,4 @@ if begin_time_stamp != False:
     ana_rt_data(rt=rteast, begin_time_stamp=begin_time_stamp, big_bl_df=None, pa_bl_df=None, date_str= '')
     # ana_rt_data(rt=rt163, big_bl_df=big_bl_df, pa_bl_df=pa_bl_df)
 
-notice_process(id_arr=id_arr, key_file='', date_arr=None)
+notice_process(id_arr=id_arr, keywords_arr=keywords_arr, date_arr=None)

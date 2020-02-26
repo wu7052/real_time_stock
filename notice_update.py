@@ -6,7 +6,7 @@ import new_logger as lg
 lg._init_()
 wx = lg.get_handle()
 from stock_package import ts_data
-from realtime_package import rt_163, rt_bl, rt_ana, rt_east
+from realtime_package import rt_163, rt_bl, rt_ana, rt_east, notice_watcher
 
 # import pandas as pd
 # from assess_package import back_trader
@@ -27,19 +27,5 @@ id_arr = xl_acc.get_stock_id_from_conf()
 xl_keywords = xl_handler(f_name="keywords.xlsx")
 keywords_arr = xl_keywords.rd_keywords_file()
 
-
-# 实时交易对象
-# rt163 = rt_163(id_arr=id_arr, date_str='')
-
-rteast = rt_east(id_arr=id_arr, date_str='', item_page = '144')
-
-# rt实时对象，src 数据源
-# 利用全局RT 对象完成 数据收集
-# 创建BL 对象完成 基线设定、导入数据库
-# 从 163 获得数据
-# rebase_rt_data(rt=rt163, src='163', date_str = '')
-# 从 eastmoney 获得数据
-rebase_rt_data(rt=rteast, src='east', date_str = '')
-
-# 查询上证、深证的公司公告
 notice_process(id_arr=id_arr, keywords_arr=keywords_arr, date_arr=None)
+

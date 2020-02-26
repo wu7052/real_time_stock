@@ -36,7 +36,7 @@ rt_delay = int(h_conf.rd_opt('general', 'rt_delay'))
 
 # 读取 accounts.xlsx
 xl_h = xl_handler(f_name="accounts.xlsx")
-xl_h.rd_file()
+xl_h.rd_accounts_file()
 id_arr = xl_h.get_stock_id_from_conf()
 
 

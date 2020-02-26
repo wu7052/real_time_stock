@@ -18,7 +18,7 @@ class xl_handler():
         wx = lg.get_handle()
         wx.info("xl_handler __del__")
 
-    def rd_file(self):
+    def rd_accounts_file(self):
         def _id_convert(id):
             if re.match(r'\d+',id):
                 id = '0'*(6-len(id)) + id
@@ -50,6 +50,13 @@ class xl_handler():
                 id_acc = tmp.append(id_acc)
         self.df_id_acc = pd.DataFrame({'id':id_acc.index, 'wechat':id_acc.values})
 
+    def rd_keywords_file(self):
+        data_type = {'多': str, '空': str}
+        df = pd.DataFrame(pd.read_excel(self.f_name, dtype=data_type))
+
+        pos_keywords__arr = df['多'].values.tolist()
+        neg_keywords_arr = df['空'].values.tolist()
+        return [pos_keywords__arr, neg_keywords_arr]
 
     # 统计需要监控的 stock id, 返回list数组
     def get_stock_id_from_conf(self):
