@@ -16,9 +16,9 @@ class conf_handler():
 
 
     def __del__(self):
-        wx = lg.get_handle()
-        wx.info("[OBJ] Conf_handler : __del__ called")
-
+        # wx = lg.get_handle()
+        # wx.info("[OBJ] Conf_handler : __del__ called")
+        pass
 
     def rd_opt(self, sec=None, opt=None):
         return self.rd.get(sec, opt)

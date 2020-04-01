@@ -10,6 +10,7 @@ import re
 from db_package import db_ops
 import os
 import sys
+import numpy as np
 
 class notice_watcher():
     def __init__(self, id_arr=None, keywords_arr=None):
@@ -83,8 +84,8 @@ class notice_watcher():
         # name = jsonpath(json_obj, '$..data..secName[0]')
         title = jsonpath(json_obj, '$..data..title')
         ann_time = jsonpath(json_obj, '$..data..publishTime')
-        id = jsonpath(json_obj, '$..data..secCode[0]')
-        # ann_id = jsonpath(json_obj, '$..data..annId')
+        id_array = jsonpath(json_obj, '$..data..secCode')
+        id = np.array(id_array).flatten().tolist()
 
         # notice_data = [ann_id, ann_time, id, name, title]
         notice_data = [ann_time, id, title]
@@ -177,7 +178,6 @@ class notice_watcher():
             return None
 
         n_id_found_df = pd.DataFrame()
-        n_keywords_found_df = pd.DataFrame()
 
         if self.id_arr is not None:
             for id in self.id_arr:
@@ -187,7 +187,7 @@ class notice_watcher():
                 if len(n_id_found_df)==0:
                     n_id_found_df = tmp
                 else:
-                    n_id_found_df = n_id_found_df.append(tmp)
+                    n_id_found_df = n_id_found_df.append(tmp,sort=False)
         else:
             n_id_found_df = None
 
@@ -202,16 +202,16 @@ class notice_watcher():
                     if n_title_found is None or len(n_title_found) == 0:
                         n_title_found = n_tmp
                     else:
-                        n_title_found = n_title_found.append(n_tmp)
+                        n_title_found = n_title_found.append(n_tmp,sort=False)
             else:
                 continue
         if n_title_found is not None and len(n_title_found) > 0:
             work_path = os.path.dirname(os.path.abspath(sys.argv[0]))
             output_path = work_path + '\\log\\'
             today = date.today().strftime('%Y%m%d')
-            filename = output_path + today + "_公告查询.xlsx"
+            filename = output_path + today + "_公告关键词过滤.xlsx"
 
-            n_title_found.to_excel(filename, index=False, sheet_name='公告查询结果', encoding='utf_8_sig')
+            n_title_found.to_excel(filename, index=False, sheet_name='关键词过滤', encoding='utf_8_sig')
         return n_id_found_df
 
 

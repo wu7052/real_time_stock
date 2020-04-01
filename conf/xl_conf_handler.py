@@ -10,13 +10,14 @@ import pandas as pd
 
 class xl_handler():
     def __init__(self, f_name=None):
-        wx = lg.get_handle()
-        wx.info("xl_handler __init__ {}".format(f_name))
+        # wx = lg.get_handle()
+        # wx.info("xl_handler __init__ {}".format(f_name))
         self.f_name = f_name
 
     def __del__(self):
-        wx = lg.get_handle()
-        wx.info("xl_handler __del__")
+        # wx = lg.get_handle()
+        # wx.info("xl_handler __del__")
+        pass
 
     def rd_accounts_file(self):
         def _id_convert(id):

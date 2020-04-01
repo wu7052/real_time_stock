@@ -300,7 +300,7 @@ def notice_process(id_arr=None, keywords_arr=None, date_arr=None):
     if date_arr is None or len(date_arr) == 0:
         date_arr= [(datetime.today() + timedelta(days=-1)).strftime('%Y-%m-%d'),
                     (datetime.today() + timedelta(days=1)).strftime('%Y-%m-%d')]
-        wx.info("[公告获取] 使用默认查询时间[{}-{}]".format(date_arr[0], date_arr[1]))
+        wx.info("[公告获取] 使用默认查询时间[{}  ： {}]".format(date_arr[0], date_arr[1]))
 
     n_watcher = notice_watcher(id_arr=id_arr, keywords_arr=keywords_arr)
     sz_notice_df = n_watcher.get_sz_noitce(date_arr = date_arr)
